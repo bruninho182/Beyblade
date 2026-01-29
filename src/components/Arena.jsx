@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set, update, query, orderByChild, limitToLast, get } from "firebase/database";
 
-// --- 1. CONFIGURAÇÃO BLINDADA (Link do Banco Adicionado) ---
+// --- 1. CONFIGURAÇÃO BLINDADA (databaseURL Adicionada) ---
 const firebaseConfig = {
   apiKey: "AIzaSyABAyy8d3qmzJ1gR0M9ykwUstyT2K71Kns",
   authDomain: "beybladeonline.firebaseapp.com",
@@ -11,8 +11,7 @@ const firebaseConfig = {
   messagingSenderId: "152863484358",
   appId: "1:152863484358:web:a888dfd532fa7896a26ac7",
   measurementId: "G-FKLQ21N2XK",
-  // O link abaixo corrige o erro de conexão do console
-  databaseURL: "https://beybladeonline-default-rtdb.firebaseio.com/" 
+  databaseURL: "https://beybladeonline-default-rtdb.firebaseio.com" // Corrige o erro de conexão
 };
 
 const app = initializeApp(firebaseConfig);
@@ -39,7 +38,7 @@ const BeybladeChampionship = () => {
   const [phase, setPhase] = useState('TITLE'); 
   const [mode, setMode] = useState(null); 
   const [roomId, setRoomId] = useState('');
-  const [joinCode, setJoinCode] = useState(''); 
+  const [joinCode, setJoinCode] = useState(''); // Estado para o input de código
   const [myRole, setMyRole] = useState('p1'); 
   const [arenaType, setArenaType] = useState('CLASSIC');
   const [sparks, setSparks] = useState([]);
@@ -65,6 +64,7 @@ const BeybladeChampionship = () => {
     return chars.charAt(Math.floor(Math.random() * chars.length));
   }, []);
 
+  // --- LÓGICA DE FAÍSCAS ---
   const addSparks = useCallback((pos) => {
     const isSD = gameState.battleTime >= 30;
     const newSparks = Array.from({ length: isSD ? 12 : 8 }).map(() => ({
@@ -87,28 +87,30 @@ const BeybladeChampionship = () => {
     }
   }, [sparks]);
 
+  // --- JOIN COM VERIFICAÇÃO ---
   const joinRoom = async (id) => {
     if (!id) return alert("DIGITE UM CÓDIGO!");
     const rId = id.toUpperCase();
     const roomRef = ref(db, 'rooms/' + rId);
     
     try {
-      const snapshot = await get(roomRef);
-      if (snapshot.exists()) {
+      const snap = await get(roomRef);
+      if (snap.exists()) {
         await update(roomRef, { 
           skinP2: selectedBey.img, 
           nameP2: userName || 'PLAYER 2', 
           status: 'READY' 
         });
-        setMyRole('p2'); setRoomId(rId); setPhase('LOBBY');
+        setMyRole('p2'); setRoomId(rId); setMode('ONLINE'); setPhase('LOBBY');
       } else {
         alert("SALA NÃO ENCONTRADA!");
       }
-    } catch (err) {
-      alert("ERRO AO CONECTAR!");
+    } catch (e) {
+      alert("ERRO DE CONEXÃO!");
     }
   };
 
+  // --- SYNC ONLINE ---
   useEffect(() => {
     if (mode === 'ONLINE' && roomId) {
       return onValue(ref(db, 'rooms/' + roomId), (snapshot) => {
@@ -121,6 +123,7 @@ const BeybladeChampionship = () => {
     }
   }, [mode, roomId, phase]);
 
+  // --- ATAQUE (TECLAS) ---
   const handleKey = useCallback((e) => {
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
     
@@ -132,14 +135,10 @@ const BeybladeChampionship = () => {
         const nextKey = generateLetter();
 
         if (mode === 'ONLINE') {
-          const updates = {};
-          if (myRole === 'p1') {
-            updates['rpmP1'] = Math.min(400, prev.rpmP1 + power);
-            updates['targetKey'] = nextKey;
-          } else {
-            updates['rpmP2'] = Math.min(400, prev.rpmP2 + power);
-          }
-          update(ref(db, 'rooms/' + roomId), updates);
+          update(ref(db, 'rooms/' + roomId), {
+            [myRole === 'p1' ? 'rpmP1' : 'rpmP2']: Math.min(400, (myRole === 'p1' ? prev.rpmP1 : prev.rpmP2) + power),
+            targetKey: myRole === 'p1' ? nextKey : prev.targetKey
+          });
           return prev;
         } else {
           return { ...prev, rpmP1: Math.min(400, prev.rpmP1 + power), targetKey: nextKey };
@@ -154,6 +153,7 @@ const BeybladeChampionship = () => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
+  // --- FISICA E REGRAS ---
   useEffect(() => {
     if ((mode === 'ONLINE' && myRole !== 'p1') || (phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
     
@@ -164,7 +164,6 @@ const BeybladeChampionship = () => {
         const pushFactor = isSD ? 0.28 : 0.15;
         let cpuBoost = (mode === 'CPU' && Math.random() > (isSD ? 0.90 : 0.94)) ? (isSD ? 35 : 20) : 0;
         const diff = prev.rpmP1 - (prev.rpmP2 + cpuBoost);
-        
         let newPos = prev.clashPos + (diff * pushFactor);
         let newWinner = null;
 
@@ -213,27 +212,20 @@ const BeybladeChampionship = () => {
         @keyframes flashAnim { from { opacity: 1; } to { opacity: 0; } }
         .stadium { width: 95vw; height: 40vh; border-top: 6px solid #333; border-bottom: 6px solid #333; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #222 0%, #000 100%); overflow: hidden; }
         .bey { width: 80px; height: 80px; position: absolute; z-index: 5; transition: left 0.1s linear, right 0.1s linear; display: flex; align-items: center; justify-content: center; }
-        .bey img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-        /* FALLBACK PARA IMAGEM 404 */
-        .bey-fallback { width: 70px; height: 70px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 15px currentColor; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; }
+        .bey img { width: 100%; height: 100%; object-fit: contain; }
+        /* FALLBACK VISUAL PARA 404 */
+        .bey-fallback { width: 70px; height: 70px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 15px currentColor; display: flex; align-items: center; justify-content: center; font-size: 8px; }
         .panel { border: 4px solid #fff; padding: 20px; background: #111; text-align: center; box-shadow: 6px 6px 0 #c0392b; }
         .btn { padding: 10px 20px; margin: 5px; background: #000; border: 3px solid #fff; color: #fff; cursor: pointer; font-size: 10px; font-family: 'Press Start 2P'; }
       `}</style>
 
       {isKOFlash && <div className="ko-flash" />}
 
-      {/* --- HUD --- */}
-      {(phase === 'BATTLE' || gameState.status === 'BATTLE') && !gameState.winner && (
-        <div style={{position: 'absolute', top: '35px', display: 'flex', gap: '20px', zIndex: 10}}>
-           <div style={{fontSize: '8px'}}>{gameState.nameP1}</div>
-           <div style={{fontSize: '12px'}}>{Math.floor(gameState.battleTime)}s</div>
-           <div style={{fontSize: '8px'}}>{gameState.nameP2}</div>
-        </div>
-      )}
-
       {/* --- ARENA --- */}
       {(phase === 'BATTLE' || gameState.status === 'BATTLE') && (
         <div className={`stadium ${gameState.battleTime >= 30 ? 'active-sd' : ''}`} style={{background: arenas[arenaType].bg, borderColor: arenas[arenaType].color}}>
+          {gameState.battleTime >= 30 && !gameState.winner && <div style={{position:'absolute', top:'10px', color:'red'}}>SUDDEN DEATH!</div>}
+
           {/* JOGADOR 1 */}
           <div className="bey" style={{ left: `calc(50% - 80px + ${gameState.clashPos}px)`, transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)`, color: selectedBey.color }}>
             <img src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} 
@@ -258,7 +250,7 @@ const BeybladeChampionship = () => {
       {phase === 'TITLE' && (
         <div className="panel">
           <h1 style={{color: '#f1c40f', fontSize: '20px'}}>BEY-CHAMPION</h1>
-          <input style={{background: '#000', color: '#fff', padding: '10px', textAlign: 'center', fontFamily: "'Press Start 2P'"}} placeholder="NAME" value={userName} onChange={(e) => setUserName(e.target.value.toUpperCase())} maxLength={10} />
+          <input style={{background: '#000', color: '#fff', padding: '10px', textAlign: 'center'}} placeholder="NOME" value={userName} onChange={(e) => setUserName(e.target.value.toUpperCase())} maxLength={10} />
           <br/><br/>
           <button className="btn" onClick={() => userName ? setPhase('MODE_SELECT') : alert("ENTER NAME")}>START</button>
           <button className="btn" onClick={() => setPhase('SHOP')}>SHOP</button>
@@ -267,34 +259,39 @@ const BeybladeChampionship = () => {
 
       {phase === 'MODE_SELECT' && (
         <div className="panel">
+          <h2>MODO</h2>
           <button className="btn" onClick={() => { setMode('CPU'); setPhase('ARENA_SELECT'); setGameState(s => ({...s, nameP1: userName, nameP2: 'CPU'})); }}>VS CPU</button>
           <button className="btn" onClick={() => setPhase('ONLINE_MENU')}>ONLINE ROOMS</button>
         </div>
       )}
 
+      {/* --- INTERFACE DE LOBBY (FIX PARA TELA PRETA) --- */}
       {phase === 'LOBBY' && (
         <div className="panel">
           <h2>LOBBY</h2>
-          <p style={{color: '#f1c40f'}}>CODE: {roomId}</p>
-          <p style={{fontSize: '10px'}}>{gameState.status === 'LOBBY' ? "WAITING..." : "READY!"}</p>
-          {myRole === 'p1' && gameState.status === 'READY' && <button className="btn" onClick={() => update(ref(db, 'rooms/' + roomId), { status: 'BATTLE' })}>START</button>}
-          <button className="btn" onClick={() => setPhase('TITLE')}>CANCEL</button>
+          <p style={{color: '#f1c40f'}}>CÓDIGO: {roomId}</p>
+          <p>{gameState.status === 'LOBBY' ? "AGUARDANDO..." : "PRONTO!"}</p>
+          {myRole === 'p1' && gameState.status === 'READY' && (
+            <button className="btn" onClick={() => update(ref(db, 'rooms/' + roomId), { status: 'BATTLE' })}>INICIAR</button>
+          )}
+          <button className="btn" onClick={() => setPhase('TITLE')}>SAIR</button>
         </div>
       )}
 
       {phase === 'ONLINE_MENU' && (
         <div className="panel">
+          <h2>ONLINE</h2>
           <button className="btn" onClick={() => {
             const newId = Math.random().toString(36).substring(7).toUpperCase();
             setRoomId(newId); setMyRole('p1'); setMode('ONLINE');
-            set(ref(db, 'rooms/' + newId), { ...gameState, skinP1: selectedBey.img, nameP1: userName || 'PLAYER 1', status: 'LOBBY' });
+            set(ref(db, 'rooms/' + newId), { ...gameState, skinP1: selectedBey.img, nameP1: userName || 'P1', status: 'LOBBY' });
             setPhase('LOBBY');
-          }}>CREATE ROOM</button>
+          }}>CRIAR SALA</button>
           <div style={{margin: '15px 0'}}>
-            <input style={{width: '100px', background: '#000', color: '#fff', border: '1px solid #fff'}} placeholder="CODE" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} />
+            <input style={{width: '100px', background: '#000', color: '#fff', border: '1px solid #fff'}} placeholder="CÓDIGO" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} />
             <button className="btn" onClick={() => joinRoom(joinCode)}>JOIN</button>
           </div>
-          <button className="btn" onClick={() => setPhase('MODE_SELECT')}>BACK</button>
+          <button className="btn" onClick={() => setPhase('MODE_SELECT')}>VOLTAR</button>
         </div>
       )}
 
@@ -318,14 +315,14 @@ const BeybladeChampionship = () => {
         <div className="panel">
           <h2>ARENA</h2>
           {Object.keys(arenas).map(id => (
-            <button key={id} className="btn" onClick={() => { setArenaType(id); setPhase('BATTLE'); setGameState(s => ({...s, status: 'BATTLE', battleTime: 0, clashPos: 0, winner: null})); }}>{arenas[id].name}</button>
+            <button key={id} className="btn" style={{borderColor: arenas[id].color}} onClick={() => { setArenaType(id); setPhase('BATTLE'); setGameState(s => ({...s, status: 'BATTLE', battleTime: 0, clashPos: 0, winner: null})); }}>{arenas[id].name}</button>
           ))}
         </div>
       )}
 
       {gameState.winner && (
         <div className="panel" style={{position: 'absolute', zIndex: 1000}}>
-          <h2 style={{color: '#f1c40f'}}>{gameState.winner} WINS!</h2>
+          <h2>{gameState.winner} WINS!</h2>
           <button className="btn" onClick={() => window.location.reload()}>FINISH</button>
         </div>
       )}
