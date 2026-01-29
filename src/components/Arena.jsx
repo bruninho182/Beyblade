@@ -94,10 +94,15 @@ const BeybladeChampionship = () => {
   useEffect(() => {
     if (mode === 'ONLINE' && roomId) {
       return onValue(ref(db, 'rooms/' + roomId), (snapshot) => {
-        if (snapshot.exists()) setGameState(snapshot.val());
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          setGameState(data);
+          // Auto-start battle para o convidado
+          if (data.status === 'BATTLE' && phase !== 'BATTLE') setPhase('BATTLE');
+        }
       });
     }
-  }, [mode, roomId]);
+  }, [mode, roomId, phase]);
 
   const handleKey = useCallback((e) => {
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
@@ -269,11 +274,28 @@ const BeybladeChampionship = () => {
         <div className="panel">
           <h2>MODE</h2>
           <button className="btn" onClick={() => { setMode('CPU'); setPhase('ARENA_SELECT'); setGameState(s => ({...s, nameP1: userName, nameP2: 'CPU'})); }}>VS CPU</button>
-          <button className="btn" onClick={() => { setMode('ONLINE'); setPhase('ONLINE_MENU'); }}>ONLINE (VIA ROOM)</button>
+          <button className="btn" onClick={() => { setMode('ONLINE'); setPhase('ONLINE_MENU'); }}>ONLINE ROOMS</button>
         </div>
       )}
 
-      {/* --- MENU ONLINE --- */}
+      {/* --- LOBBY (FIX PARA TELA PRETA) --- */}
+      {phase === 'LOBBY' && (
+        <div className="panel">
+          <h2>LOBBY</h2>
+          <p style={{color: '#f1c40f', fontSize: '14px'}}>CODE: {roomId}</p>
+          <p style={{fontSize: '10px', margin: '20px 0'}}>
+            {gameState.status === 'LOBBY' ? "WAITING FOR OPPONENT..." : "OPPONENT READY!"}
+          </p>
+          {myRole === 'p1' && gameState.status === 'READY' && (
+            <button className="btn" onClick={() => {
+              setPhase('BATTLE');
+              update(ref(db, 'rooms/' + roomId), { status: 'BATTLE' });
+            }}>START BATTLE</button>
+          )}
+          <button className="btn" onClick={() => setPhase('TITLE')}>CANCEL</button>
+        </div>
+      )}
+
       {phase === 'ONLINE_MENU' && (
         <div className="panel">
           <h2>ONLINE ROOMS</h2>
