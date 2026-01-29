@@ -62,7 +62,6 @@ const BeybladeChampionship = () => {
     return chars.charAt(Math.floor(Math.random() * chars.length));
   }, []);
 
-  // --- LÓGICA DE FAÍSCAS ---
   const addSparks = useCallback((pos) => {
     const isSD = gameState.battleTime >= 30;
     const newSparks = Array.from({ length: isSD ? 12 : 8 }).map(() => ({
@@ -85,11 +84,24 @@ const BeybladeChampionship = () => {
     }
   }, [sparks]);
 
-  // --- ATAQUE (TECLAS) ---
+  const joinRoom = (id) => {
+    const rId = id.toUpperCase();
+    update(ref(db, 'rooms/' + rId), { skinP2: selectedBey.img, nameP2: userName || 'PLAYER 2', status: 'READY' }).then(() => {
+      setMyRole('p2'); setRoomId(rId); setPhase('LOBBY');
+    });
+  };
+
+  useEffect(() => {
+    if (mode === 'ONLINE' && roomId) {
+      return onValue(ref(db, 'rooms/' + roomId), (snapshot) => {
+        if (snapshot.exists()) setGameState(snapshot.val());
+      });
+    }
+  }, [mode, roomId]);
+
   const handleKey = useCallback((e) => {
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
     
-    // Usamos o estado funcional para garantir que pegamos o targetKey correto
     setGameState(prev => {
       if (e.key.toUpperCase() === prev.targetKey) {
         addSparks(prev.clashPos);
@@ -106,7 +118,7 @@ const BeybladeChampionship = () => {
             updates['rpmP2'] = Math.min(400, prev.rpmP2 + power);
           }
           update(ref(db, 'rooms/' + roomId), updates);
-          return prev; // O onValue atualizará o estado local
+          return prev;
         } else {
           return { ...prev, rpmP1: Math.min(400, prev.rpmP1 + power), targetKey: nextKey };
         }
@@ -120,7 +132,6 @@ const BeybladeChampionship = () => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
-  // --- FISICA E REGRAS ---
   useEffect(() => {
     if ((mode === 'ONLINE' && myRole !== 'p1') || (phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
     
@@ -129,14 +140,12 @@ const BeybladeChampionship = () => {
         const isSD = prev.battleTime >= 30;
         const drain = arenas[arenaType].drain * (isSD ? 2.2 : 1.0);
         const pushFactor = isSD ? 0.28 : 0.15;
-        
         let cpuBoost = (mode === 'CPU' && Math.random() > (isSD ? 0.90 : 0.94)) ? (isSD ? 35 : 20) : 0;
         const diff = prev.rpmP1 - (prev.rpmP2 + cpuBoost);
         
         let newPos = prev.clashPos + (diff * pushFactor);
         let newWinner = null;
 
-        // Detecção de K.O.
         if (newPos > 700 || newPos < -700) {
           setIsKOFlash(true);
           setTimeout(() => setIsKOFlash(false), 200);
@@ -160,21 +169,11 @@ const BeybladeChampionship = () => {
     return () => clearInterval(interval);
   }, [mode, myRole, phase, gameState.status, gameState.winner, roomId, arenaType]);
 
-  // --- ONLINE SYNC ---
-  useEffect(() => {
-    if (mode === 'ONLINE' && roomId) {
-      return onValue(ref(db, 'rooms/' + roomId), (snapshot) => {
-        if (snapshot.exists()) setGameState(snapshot.val());
-      });
-    }
-  }, [mode, roomId]);
-
-  // --- LÓGICA DE TREMOR E TELA VERMELHA ---
   const getShakeClass = () => {
     if (gameState.winner) return ''; 
     const absPos = Math.abs(gameState.clashPos);
-    if (gameState.battleTime >= 30) return 'shake-sd'; // Vermelho Sudden Death
-    if (absPos > 600) return 'shake-hard'; // Vermelho Perigo Borda
+    if (gameState.battleTime >= 30) return 'shake-sd'; 
+    if (absPos > 600) return 'shake-hard'; 
     if (absPos > 480) return 'shake-soft';
     return '';
   };
@@ -185,7 +184,6 @@ const BeybladeChampionship = () => {
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         .game-root { position: fixed; inset: 0; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transition: background 0.5s; }
         
-        /* SHAKE E CORES DE FUNDO */
         .shake-soft { animation: shakeEffect 0.12s infinite; }
         .shake-hard { animation: shakeEffect 0.08s infinite; background: #2a0000 !important; }
         .shake-sd { animation: shakeEffect 0.1s infinite; background: #1a0000 !important; }
@@ -216,7 +214,7 @@ const BeybladeChampionship = () => {
 
       {isKOFlash && <div className="ko-flash" />}
 
-      {/* HUD DE BATALHA */}
+      {/* --- HUD --- */}
       {(phase === 'BATTLE' || gameState.status === 'BATTLE') && !gameState.winner && (
         <div className="hud-battle">
           <div style={{textAlign: 'center'}}>
@@ -233,7 +231,7 @@ const BeybladeChampionship = () => {
         </div>
       )}
 
-      {/* ARENA */}
+      {/* --- ARENA --- */}
       {(phase === 'BATTLE' || gameState.status === 'BATTLE') && (
         <div className={`stadium ${gameState.battleTime >= 30 ? 'active-sd' : ''}`} style={{background: arenas[arenaType].bg, borderColor: arenas[arenaType].color}}>
           {gameState.battleTime >= 30 && !gameState.winner && <div className="sd-text">SUDDEN DEATH!</div>}
@@ -256,7 +254,7 @@ const BeybladeChampionship = () => {
         </div>
       )}
 
-      {/* MENUS */}
+      {/* --- MENUS --- */}
       {phase === 'TITLE' && (
         <div className="panel">
           <h1 style={{color: '#f1c40f', fontSize: '20px', marginBottom: '20px'}}>BEY-CHAMPION</h1>
@@ -271,11 +269,25 @@ const BeybladeChampionship = () => {
         <div className="panel">
           <h2>MODE</h2>
           <button className="btn" onClick={() => { setMode('CPU'); setPhase('ARENA_SELECT'); setGameState(s => ({...s, nameP1: userName, nameP2: 'CPU'})); }}>VS CPU</button>
+          <button className="btn" onClick={() => { setMode('ONLINE'); setPhase('ONLINE_MENU'); }}>ONLINE (VIA ROOM)</button>
+        </div>
+      )}
+
+      {/* --- MENU ONLINE --- */}
+      {phase === 'ONLINE_MENU' && (
+        <div className="panel">
+          <h2>ONLINE ROOMS</h2>
           <button className="btn" onClick={() => {
-            setMode('ONLINE');
-            setPhase('TITLE');
-            alert("USE CREATE ROOM IN THE ONLINE MENU");
-          }}>ONLINE (VIA ROOM)</button>
+            const newId = Math.random().toString(36).substring(7).toUpperCase();
+            setRoomId(newId); setMyRole('p1');
+            set(ref(db, 'rooms/' + newId), { ...gameState, skinP1: selectedBey.img, nameP1: userName || 'PLAYER 1', status: 'LOBBY' });
+            setPhase('LOBBY');
+          }}>CREATE ROOM</button>
+          <div style={{margin: '15px 0'}}>
+            <input id="roomIn" style={{padding: '5px', width: '100px', background: '#000', color: '#fff', border: '1px solid #fff'}} placeholder="CODE" />
+            <button className="btn" onClick={() => joinRoom(document.getElementById('roomIn').value)}>JOIN</button>
+          </div>
+          <button className="btn" onClick={() => setPhase('MODE_SELECT')}>BACK</button>
         </div>
       )}
 
@@ -321,15 +333,9 @@ const Lightning = ({ bolColor }) => (
   <div style={{ position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', pointerEvents: 'none' }}>
     {[...Array(4)].map((_, i) => (
       <div key={i} style={{
-        position: 'absolute',
-        width: '2px',
-        height: `${Math.random() * 50 + 20}px`,
-        background: bolColor,
-        left: `${Math.random() * 100}%`,
-        top: `${Math.random() * 100}%`,
-        boxShadow: `0 0 12px ${bolColor}`,
-        transform: `rotate(${Math.random() * 360}deg)`,
-        opacity: Math.random() > 0.3 ? 0.8 : 0,
+        position: 'absolute', width: '2px', height: `${Math.random() * 50 + 20}px`, background: bolColor,
+        left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, boxShadow: `0 0 12px ${bolColor}`,
+        transform: `rotate(${Math.random() * 360}deg)`, opacity: Math.random() > 0.3 ? 0.8 : 0,
       }} />
     ))}
   </div>
