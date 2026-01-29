@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, set, update, query, orderByChild, limitToLast } from "firebase/database";
+import { getDatabase, ref, onValue, set, update, query, orderByChild, limitToLast, get } from "firebase/database";
 
 // --- 1. CONFIGURAÇÃO DO SEU FIREBASE ---
 const firebaseConfig = {
@@ -37,6 +37,7 @@ const BeybladeChampionship = () => {
   const [phase, setPhase] = useState('TITLE'); 
   const [mode, setMode] = useState(null); 
   const [roomId, setRoomId] = useState('');
+  const [joinCode, setJoinCode] = useState(''); // Novo: Estado para o código digitado
   const [myRole, setMyRole] = useState('p1'); 
   const [arenaType, setArenaType] = useState('CLASSIC');
   const [sparks, setSparks] = useState([]);
@@ -84,10 +85,26 @@ const BeybladeChampionship = () => {
     }
   }, [sparks]);
 
+  // --- LÓGICA DE JOIN CORRIGIDA ---
   const joinRoom = (id) => {
+    if (!id) return alert("DIGITE UM CÓDIGO!");
     const rId = id.toUpperCase();
-    update(ref(db, 'rooms/' + rId), { skinP2: selectedBey.img, nameP2: userName || 'PLAYER 2', status: 'READY' }).then(() => {
-      setMyRole('p2'); setRoomId(rId); setPhase('LOBBY');
+    const roomRef = ref(db, 'rooms/' + rId);
+    
+    get(roomRef).then((snapshot) => {
+      if (snapshot.exists()) {
+        update(roomRef, { 
+          skinP2: selectedBey.img, 
+          nameP2: userName || 'PLAYER 2', 
+          status: 'READY' 
+        }).then(() => {
+          setMyRole('p2'); 
+          setRoomId(rId); 
+          setPhase('LOBBY');
+        });
+      } else {
+        alert("SALA NÃO ENCONTRADA!");
+      }
     });
   };
 
@@ -97,7 +114,6 @@ const BeybladeChampionship = () => {
         if (snapshot.exists()) {
           const data = snapshot.val();
           setGameState(data);
-          // Auto-start battle para o convidado
           if (data.status === 'BATTLE' && phase !== 'BATTLE') setPhase('BATTLE');
         }
       });
@@ -274,7 +290,7 @@ const BeybladeChampionship = () => {
         <div className="panel">
           <h2>MODE</h2>
           <button className="btn" onClick={() => { setMode('CPU'); setPhase('ARENA_SELECT'); setGameState(s => ({...s, nameP1: userName, nameP2: 'CPU'})); }}>VS CPU</button>
-          <button className="btn" onClick={() => { setMode('ONLINE'); setPhase('ONLINE_MENU'); }}>ONLINE ROOMS</button>
+          <button className="btn" onClick={() => setPhase('ONLINE_MENU')}>ONLINE ROOMS</button>
         </div>
       )}
 
@@ -282,17 +298,17 @@ const BeybladeChampionship = () => {
       {phase === 'LOBBY' && (
         <div className="panel">
           <h2>LOBBY</h2>
-          <p style={{color: '#f1c40f', fontSize: '14px'}}>CODE: {roomId}</p>
+          <p style={{color: '#f1c40f', fontSize: '14px'}}>CÓDIGO: {roomId}</p>
           <p style={{fontSize: '10px', margin: '20px 0'}}>
-            {gameState.status === 'LOBBY' ? "WAITING FOR OPPONENT..." : "OPPONENT READY!"}
+            {gameState.status === 'LOBBY' ? "AGUARDANDO OPONENTE..." : "OPONENTE PRONTO!"}
           </p>
           {myRole === 'p1' && gameState.status === 'READY' && (
             <button className="btn" onClick={() => {
               setPhase('BATTLE');
               update(ref(db, 'rooms/' + roomId), { status: 'BATTLE' });
-            }}>START BATTLE</button>
+            }}>INICIAR BATALHA</button>
           )}
-          <button className="btn" onClick={() => setPhase('TITLE')}>CANCEL</button>
+          <button className="btn" onClick={() => setPhase('TITLE')}>CANCELAR</button>
         </div>
       )}
 
@@ -304,12 +320,17 @@ const BeybladeChampionship = () => {
             setRoomId(newId); setMyRole('p1');
             set(ref(db, 'rooms/' + newId), { ...gameState, skinP1: selectedBey.img, nameP1: userName || 'PLAYER 1', status: 'LOBBY' });
             setPhase('LOBBY');
-          }}>CREATE ROOM</button>
+          }}>CRIAR SALA</button>
           <div style={{margin: '15px 0'}}>
-            <input id="roomIn" style={{padding: '5px', width: '100px', background: '#000', color: '#fff', border: '1px solid #fff'}} placeholder="CODE" />
-            <button className="btn" onClick={() => joinRoom(document.getElementById('roomIn').value)}>JOIN</button>
+            <input 
+              style={{padding: '5px', width: '100px', background: '#000', color: '#fff', border: '1px solid #fff', fontFamily: "'Press Start 2P'", fontSize: '10px'}} 
+              placeholder="CÓDIGO" 
+              value={joinCode} 
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+            />
+            <button className="btn" onClick={() => joinRoom(joinCode)}>JOIN</button>
           </div>
-          <button className="btn" onClick={() => setPhase('MODE_SELECT')}>BACK</button>
+          <button className="btn" onClick={() => setPhase('MODE_SELECT')}>VOLTAR</button>
         </div>
       )}
 
