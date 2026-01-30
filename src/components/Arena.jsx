@@ -18,7 +18,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // --- 2. ASSETS ---
-const BATTLE_MUSIC_URL = "/music.mp3"; 
+const BATTLE_MUSIC_URL = "/battlesong.mp3"; 
 const CLASH_SFX_URL = "/clash.mp3"; 
 const ROAR_SFX_URL = "https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a"; 
 
