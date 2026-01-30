@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set, update, get } from "firebase/database";
 
-// --- 1. CONFIGURAÇÃO (MANTIDA) ---
+// --- 1. CONFIGURAÇÃO (BLINDADA) ---
 const firebaseConfig = {
   apiKey: "AIzaSyABAyy8d3qmzJ1gR0M9ykwUstyT2K71Kns",
   authDomain: "beybladeonline.firebaseapp.com",
@@ -16,6 +16,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+
+// --- 2. ASSETS DE ÁUDIO ---
+const BATTLE_MUSIC_URL = "/battlesong.mp3";
+const CLASH_SFX_URL = "https://rpg.hamsterrepublic.com/wiki-images/2/21/Collision8-Bit.ogg";
 
 const BEY_SHOP = [
   { id: 'p1', name: 'PEGASUS', color: '#00d4ff', price: 0, img: "beyblade.png" },
@@ -44,6 +48,10 @@ const BeybladeChampionship = () => {
   const [sparks, setSparks] = useState([]);
   const [isKOFlash, setIsKOFlash] = useState(false);
   
+  // --- Refs de Áudio ---
+  const bgmRef = useRef(new Audio(BATTLE_MUSIC_URL));
+  const sfxRef = useRef(new Audio(CLASH_SFX_URL));
+
   const [gameState, setGameState] = useState({
     rpmP1: 50, rpmP2: 50,
     clashPos: 0, 
@@ -53,6 +61,31 @@ const BeybladeChampionship = () => {
     nameP1: 'PLAYER 1', nameP2: 'CPU',
     battleTime: 0
   });
+
+  // --- CONFIGURAÇÃO DE SOM ---
+  useEffect(() => {
+    // Configura loops e volumes iniciais
+    bgmRef.current.loop = true;
+    bgmRef.current.volume = 0.4; // Volume da música um pouco mais baixo
+    sfxRef.current.volume = 0.7; // Efeito sonoro mais alto
+  }, []);
+
+  // Tocar música apenas na batalha
+  useEffect(() => {
+    if ((phase === 'BATTLE' || gameState.status === 'BATTLE') && !gameState.winner) {
+      bgmRef.current.play().catch(e => console.log("Áudio bloqueado pelo navegador até interação"));
+    } else {
+      bgmRef.current.pause();
+      bgmRef.current.currentTime = 0;
+    }
+  }, [phase, gameState.status, gameState.winner]);
+
+  // Função para tocar o som de impacto (usando clone para permitir sons simultâneos)
+  const playClashSound = useCallback(() => {
+    const sound = sfxRef.current.cloneNode();
+    sound.volume = 0.6;
+    sound.play().catch(() => {});
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('bey_coins', coins);
@@ -112,7 +145,6 @@ const BeybladeChampionship = () => {
       return onValue(roomRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.val();
-          // Merge cuidadoso para não sobrescrever dados locais instantaneamente se tiver lag
           setGameState(prev => ({...prev, ...data}));
           if (data.status === 'BATTLE' && phase !== 'BATTLE') setPhase('BATTLE');
         }
@@ -126,24 +158,23 @@ const BeybladeChampionship = () => {
     setGameState(prev => {
       if (e.key.toUpperCase() === prev.targetKey) {
         addSparks(prev.clashPos);
+        playClashSound(); // <--- TOCA O SOM AQUI
+        
         const power = prev.battleTime >= 30 ? 45 : 25;
         const nextKey = generateLetter();
 
         if (mode === 'ONLINE') {
           const updates = {};
           
-          // CADA UM SÓ ATUALIZA O SEU PRÓPRIO RPM
           if (myRole === 'p1') {
             updates['rpmP1'] = Math.min(400, prev.rpmP1 + power);
           } else {
             updates['rpmP2'] = Math.min(400, prev.rpmP2 + power);
           }
           
-          // O vencedor do clique atualiza a chave para todos
           updates['targetKey'] = nextKey;
           update(ref(db, `rooms/${roomId}`), updates);
           
-          // Retorno otimista (atualiza na tela antes de ir pro banco)
           return {
              ...prev, 
              [myRole === 'p1' ? 'rpmP1' : 'rpmP2']: Math.min(400, (myRole === 'p1' ? prev.rpmP1 : prev.rpmP2) + power),
@@ -155,32 +186,25 @@ const BeybladeChampionship = () => {
       }
       return prev;
     });
-  }, [phase, gameState.status, gameState.winner, mode, myRole, roomId, generateLetter, addSparks]);
+  }, [phase, gameState.status, gameState.winner, mode, myRole, roomId, generateLetter, addSparks, playClashSound]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
-  // --- LOOP FÍSICO DO HOST (PLAYER 1) ---
-  // Responsabilidade: Decair RPM do P1, Calcular Posição, Atualizar Tempo.
-  // IMPORTANTE: NÃO TOCA NO RPM DO P2.
+  // --- LOOP FÍSICO DO HOST ---
   useEffect(() => {
-    if (mode === 'ONLINE' && myRole !== 'p1') return; // Se não for P1, sai daqui
+    if (mode === 'ONLINE' && myRole !== 'p1') return;
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
     
     const interval = setInterval(() => {
       setGameState(prev => {
         const isSD = prev.battleTime >= 30;
         const drain = arenas[arenaType].drain * (isSD ? 2.2 : 1.0);
-        
-        // P1 controla a CPU no modo offline
         let cpuBoost = (mode === 'CPU' && Math.random() > (isSD ? 0.90 : 0.94)) ? (isSD ? 35 : 20) : 0;
         
-        // Host calcula o decaimento do P1
         const newRpmP1 = Math.max(0, prev.rpmP1 - 0.75 * drain);
-        
-        // Se for CPU, Host calcula P2. Se for Online, Host SÓ LÊ o P2 (não altera)
         const rpmP2ForPhysics = mode === 'ONLINE' ? prev.rpmP2 : Math.max(0, prev.rpmP2 + cpuBoost - 0.75 * drain);
 
         const diff = newRpmP1 - rpmP2ForPhysics;
@@ -194,11 +218,10 @@ const BeybladeChampionship = () => {
         }
 
         if (mode === 'ONLINE') {
-            // HOST ATUALIZA APENAS O QUE É DELE + RESULTADO DA FÍSICA
             update(ref(db, `rooms/${roomId}`), {
                 battleTime: prev.battleTime + 0.1,
                 clashPos: newPos,
-                rpmP1: newRpmP1, // Host só escreve RPM1
+                rpmP1: newRpmP1,
                 winner: newWinner
             });
         }
@@ -216,24 +239,18 @@ const BeybladeChampionship = () => {
     return () => clearInterval(interval);
   }, [mode, myRole, phase, gameState.status, gameState.winner, roomId, arenaType]);
 
-  // --- LOOP FÍSICO DO GUEST (PLAYER 2) ---
-  // Responsabilidade: APENAS Decair RPM do P2 e salvar no banco.
+  // --- LOOP FÍSICO DO GUEST ---
   useEffect(() => {
-    if (mode !== 'ONLINE' || myRole !== 'p2') return; // Só roda se for P2 Online
+    if (mode !== 'ONLINE' || myRole !== 'p2') return;
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
 
     const interval = setInterval(() => {
         setGameState(prev => {
             const isSD = prev.battleTime >= 30;
             const drain = arenas[arenaType].drain * (isSD ? 2.2 : 1.0);
-            
-            // P2 calcula seu próprio decaimento
             const newRpmP2 = Math.max(0, prev.rpmP2 - 0.75 * drain);
             
-            // P2 envia APENAS o seu RPM para o banco
-            update(ref(db, `rooms/${roomId}`), {
-                rpmP2: newRpmP2
-            });
+            update(ref(db, `rooms/${roomId}`), { rpmP2: newRpmP2 });
 
             return { ...prev, rpmP2: newRpmP2 };
         });
@@ -270,7 +287,6 @@ const BeybladeChampionship = () => {
         .bey { width: 80px; height: 80px; position: absolute; z-index: 5; transition: left 0.1s linear, right 0.1s linear; display: flex; align-items: center; justify-content: center; }
         .bey img { width: 100%; height: 100%; object-fit: contain; }
         .bey-fallback { width: 100%; height: 100%; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 15px currentColor; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; background: #000; }
-        
         .qte-center { 
           position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
           background: rgba(0,0,0,0.8); color: #fff; width: 60px; height: 60px;
@@ -278,7 +294,6 @@ const BeybladeChampionship = () => {
           border: 4px solid #f1c40f; font-size: 30px; z-index: 100; 
           box-shadow: 0 0 20px #f1c40f; border-radius: 10px;
         }
-
         .panel { border: 4px solid #fff; padding: 20px; background: #111; text-align: center; box-shadow: 6px 6px 0 #c0392b; }
         .btn { padding: 10px 20px; margin: 5px; background: #000; border: 3px solid #fff; color: #fff; cursor: pointer; font-family: 'Press Start 2P'; font-size: 10px; }
       `}</style>
@@ -339,7 +354,8 @@ const BeybladeChampionship = () => {
           <h1 style={{color: '#f1c40f', fontSize: '20px', marginBottom: '20px'}}>BEY-CHAMPION</h1>
           <input style={{background: '#000', border: '2px solid #fff', color: '#fff', padding: '10px', textAlign: 'center', fontFamily: "'Press Start 2P'"}} placeholder="NAME" value={userName} onChange={(e) => setUserName(e.target.value.toUpperCase())} maxLength={10} />
           <br/><br/>
-          <button className="btn" onClick={() => userName ? setPhase('MODE_SELECT') : alert("ENTER NAME")}>START</button>
+          {/* Adicionamos a lógica para destravar áudio aqui */}
+          <button className="btn" onClick={() => { bgmRef.current.play().catch(() => {}); userName ? setPhase('MODE_SELECT') : alert("ENTER NAME"); }}>START</button>
           <button className="btn" onClick={() => setPhase('SHOP')}>SHOP</button>
         </div>
       )}
