@@ -764,23 +764,26 @@ const BeybladeChampionship = () => {
 
       {isKOFlash && <div className="ko-flash" />}
 
-        {combo > 1 && (
-        <div style={{
-          position: 'absolute',
-          top: '25%', // Ajustado para não bater no HUD
-          left: '10%',
-          fontSize: combo > 10 ? '24px' : '18px',
-          color: combo > 10 ? '#ff4500' : '#f1c40f',
-          textShadow: '3px 3px #000',
-          fontFamily: "'Press Start 2P', cursive", // Garante a fonte de jogo
-          animation: 'pulseCount 0.2s infinite alternate',
-          zIndex: 200, // Na frente de tudo
-          pointerEvents: 'none'
-        }}>
-          COMBO X{combo}
-        </div>
-      )}
-
+      {/* SISTEMA DE COMBO DINÂMICO (ESQUERDA/DIREITA) */}
+{combo > 0 && (
+  <div style={{
+    position: 'absolute',
+    top: '25%',
+    // Se você for o P2, ele cola na direita (10%). Se for P1, na esquerda (10%).
+    left: myRole === 'p1' ? '10%' : 'auto',
+    right: myRole === 'p2' ? '10%' : 'auto',
+    fontSize: combo > 10 ? '24px' : '18px',
+    color: combo > 10 ? '#ff4500' : '#f1c40f',
+    textShadow: '3px 3px #000',
+    fontFamily: "'Press Start 2P', cursive",
+    animation: 'pulseCount 0.2s infinite alternate',
+    zIndex: 200,
+    pointerEvents: 'none',
+    textAlign: myRole === 'p1' ? 'left' : 'right'
+  }}>
+    COMBO X{combo}
+  </div>
+)}
       {hitFeedback && (
           <div className="hit-feedback" style={{color: hitFeedback.color, transform: `translateX(-50%) scale(${hitFeedback.scale})`}}>
               {hitFeedback.text}
