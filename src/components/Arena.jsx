@@ -445,28 +445,28 @@ const BeybladeChampionship = () => {
         @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
         @keyframes zoomBeast { 0% { transform: scale(0.5); opacity: 0; } 20% { transform: scale(1.2); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
 
+        /* --- TAMANHOS AJUSTADOS (V28) --- */
         .stadium { width: 95vw; height: 40vh; border-top: 6px solid #333; border-bottom: 6px solid #333; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #222 0%, #000 100%); }
-        .bey { width: 80px; height: 80px; position: absolute; z-index: 5; transition: left 0.1s linear, right 0.1s linear; display: flex; align-items: center; justify-content: center; }
+        .bey { width: 70px; height: 70px; position: absolute; z-index: 5; transition: left 0.1s linear, right 0.1s linear; display: flex; align-items: center; justify-content: center; } /* Reduzido de 80 para 70 */
         .bey img { width: 100%; height: 100%; object-fit: contain; }
         .bey-fallback { width: 100%; height: 100%; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 15px currentColor; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; background: #000; }
         .qte-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border: 4px solid #f1c40f; font-size: 30px; z-index: 100; box-shadow: 0 0 20px #f1c40f; border-radius: 10px; }
+        
         .panel { border: 4px solid #fff; padding: 20px; background: #111; text-align: center; box-shadow: 6px 6px 0 #c0392b; max-width: 90vw; }
         .btn { padding: 10px 20px; margin: 5px; background: #000; border: 3px solid #fff; color: #fff; cursor: pointer; font-family: 'Press Start 2P'; font-size: 10px; }
         .rank-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 8px; margin-top: 5px; color: #000; font-weight: bold; }
         .achievements { margin-top: 5px; font-size: 14px; letter-spacing: 2px; }
         
-        .leaderboard-container { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; padding: 10px; width: 150px; z-index: 50; max-height: 80vh; overflow-y: auto; }
-        @media (max-width: 768px) { .leaderboard-container { position: static; transform: none; width: 90vw; margin: 10px auto; order: 2; } .game-root { overflow-y: auto; } }
-
         .gacha-box { width: 100px; height: 100px; background: #333; border: 4px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 20px; animation: gachaShake 0.5s infinite; }
         @keyframes gachaShake { 0% { transform: rotate(0deg); } 25% { transform: rotate(5deg); } 75% { transform: rotate(-5deg); } 100% { transform: rotate(0deg); } }
         .rarity-LEGENDARY { color: #ffd700; text-shadow: 0 0 10px #ffd700; animation: pulseUlt 1s infinite; }
         .rarity-RARE { color: #2ecc71; }
         .rarity-COMMON { color: #fff; }
 
-        /* --- O SEGREDO DO MOBILE (CONSOLE MODE) --- */
-        
-        /* 1. Aviso de Rotação (Aparece se estiver em pé) */
+        /* LEADERBOARD DESKTOP */
+        .leaderboard-container { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; padding: 10px; width: 150px; z-index: 50; max-height: 80vh; overflow-y: auto; }
+
+        /* AVISO DE ROTAÇÃO */
         .rotate-warning { display: none; position: fixed; inset: 0; background: #000; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #f1c40f; }
         .rotate-icon { font-size: 50px; animation: spinIcon 2s infinite ease-in-out; margin-bottom: 20px; }
         @keyframes spinIcon { 0% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } 100% { transform: rotate(0deg); } }
@@ -475,12 +475,11 @@ const BeybladeChampionship = () => {
             .rotate-warning { display: flex; }
         }
 
-        /* 2. Controles Console (Só aparece deitado) */
+        /* CONTROLES MOBILE */
         .mobile-controls {
-           position: absolute; bottom: 10px; width: 100%; display: none; justify-content: space-between; align-items: flex-end; padding: 0 40px; box-sizing: border-box; z-index: 500; pointer-events: none; /* Deixa clicar no que tá embaixo se precisar */
+           position: absolute; bottom: 10px; width: 100%; display: none; justify-content: space-between; align-items: flex-end; padding: 0 40px; box-sizing: border-box; z-index: 500; pointer-events: none; 
         }
         
-        /* Direita: Grid de Ação */
         .mobile-grid {
            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; pointer-events: auto;
         }
@@ -491,7 +490,6 @@ const BeybladeChampionship = () => {
         }
         .mob-btn:active { background: #fff; color: #000; }
         
-        /* Esquerda: Botão Ultimate */
         .ult-btn-mobile {
             width: 80px; height: 80px; background: radial-gradient(circle, #ffd700, #ffaa00); border: 4px solid #fff;
             color: #000; font-family: 'Press Start 2P'; font-size: 10px; font-weight: bold;
@@ -501,12 +499,22 @@ const BeybladeChampionship = () => {
         .ult-btn-mobile:active { transform: scale(0.9); }
         .ult-btn-mobile.disabled { filter: grayscale(1); opacity: 0.5; }
 
+        /* AJUSTES PARA MOBILE (LANDSCAPE) */
         @media (orientation: landscape) and (max-width: 900px) {
            .mobile-controls { display: flex; }
-           .stadium { width: 100vw; height: 65vh; border: none; } /* Arena ocupa tela toda */
-           .hud-battle { top: 5px; width: 60%; left: 20%; } /* HUD menorzinho */
-           .bar-outer { width: 100px; height: 8px; } /* Barras menores */
-           .panel { transform: scale(0.8); } /* Menus menores para caber */
+           .stadium { width: 100vw; height: 50vh; border: none; } /* Arena ocupa 50% da altura para deixar espaço */
+           .bey { width: 50px; height: 50px; } /* Beyblades menores no celular */
+           
+           .hud-battle { top: 5px; width: 60%; left: 20%; } 
+           .bar-outer { width: 100px; height: 8px; } 
+           .panel { transform: scale(0.85); margin-top: 10px; } 
+           
+           /* FIX DO RANKING NO MOBILE: VIRA RELATIVO */
+           .leaderboard-container {
+              position: static; transform: none; width: 90%; margin: 10px auto; order: 10; max-height: 120px;
+           }
+           /* Força a tela de título a usar flex-col para o rank ir pra baixo */
+           .game-root { display: flex; flex-direction: column; overflow-y: auto; justify-content: flex-start; padding-top: 20px; }
         }
       `}</style>
       
@@ -519,7 +527,6 @@ const BeybladeChampionship = () => {
 
       {isKOFlash && <div className="ko-flash" />}
 
-      {/* CUT-INS DE ULTIMATE */}
       {showBeastP1 && (
          <div className="beast-cutin" style={{justifyContent: 'flex-start', paddingLeft: '50px'}}>
              <img src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} className="beast-img" style={{filter: `drop-shadow(0 0 20px ${selectedBey.color}) brightness(1.5)`}} />
@@ -555,18 +562,13 @@ const BeybladeChampionship = () => {
           </div>
         </div>
 
-        {/* CONTROLES MOBILE (CONSOLE STYLE) */}
         <div className="mobile-controls">
-           {/* ESQUERDA: ULTIMATE */}
            <div className={`ult-btn-mobile ${gameState.ultP1 < 100 ? 'disabled' : ''}`} 
                 onTouchStart={(e) => { e.preventDefault(); triggerGameAction('SPACE'); }}>
                ULT
            </div>
-
-           {/* DIREITA: BOTÕES DE AÇÃO */}
            <div className="mobile-grid">
-               {['A','B','C','D','E','F','G','H','I'].map((_, i) => { // Renderiza 9 botões genéricos
-                   // Mapeamos as letras mais comuns do jogo
+               {['A','B','C','D','E','F','G','H','I'].map((_, i) => {
                    const keys = ['L','U','R','X','A','B','Y','D','N'];
                    const k = keys[i];
                    return (
@@ -585,13 +587,13 @@ const BeybladeChampionship = () => {
           {gameState.battleTime >= 30 && !gameState.winner && <div style={{position: 'absolute', top: '10px', color: 'red', zIndex:20}}>SUDDEN DEATH!</div>}
           {!gameState.winner && <div className="qte-center">{gameState.targetKey}</div>}
           
-          <div className="bey" style={{ left: `calc(50% - 80px + ${gameState.clashPos}px)`, color: selectedBey.color }}>
+          <div className="bey" style={{ left: `calc(50% - ${mode === 'ONLINE' || window.innerWidth < 900 ? '50px' : '70px'} + ${gameState.clashPos}px)`, color: selectedBey.color }}>
             <img src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} width="100%" alt="P1" style={{ transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)`, filter: selectedBey.rarity === 'LEGENDARY' ? 'sepia(100%) hue-rotate(5deg) saturate(300%)' : 'none' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             <div className="bey-fallback" style={{display: 'none', borderColor: selectedBey.color, transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)`}}>P1</div>
             {gameState.battleTime >= 30 && <Lightning bolColor="#00d4ff" />}
           </div>
           
-          <div className="bey" style={{ right: `calc(50% - 80px - ${gameState.clashPos}px)`, color: '#ff4b2b' }}>
+          <div className="bey" style={{ right: `calc(50% - ${mode === 'ONLINE' || window.innerWidth < 900 ? '50px' : '70px'} - ${gameState.clashPos}px)`, color: '#ff4b2b' }}>
             <img src={gameState.skinP2} width="100%" alt="P2" style={{ transform: `rotate(-${Date.now() * (gameState.rpmP2/10)}deg)` }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             <div className="bey-fallback" style={{display: 'none', borderColor: '#ff4b2b', transform: `rotate(-${Date.now() * (gameState.rpmP2/10)}deg)`}}>P2</div>
             {gameState.battleTime >= 30 && <Lightning bolColor="#ff4b2b" />}
@@ -603,16 +605,10 @@ const BeybladeChampionship = () => {
         </div>
       )}
 
-      {/* MENUS (GACHA, TITLE, SHOP, LOBBY, ETC) */}
-      
       {phase === 'GACHA_REVEAL' && (
         <div className="panel">
             {gachaAnimating ? (
-                <div>
-                    <h2>OPENING...</h2>
-                    <div className="gacha-box">?</div>
-                    <p>Good Luck!</p>
-                </div>
+                <div><h2>OPENING...</h2><div className="gacha-box">?</div><p>Good Luck!</p></div>
             ) : (
                 <div>
                     <h2 className={`rarity-${gachaResult.item.rarity}`}>{gachaResult.item.rarity} PULL!</h2>
@@ -642,12 +638,17 @@ const BeybladeChampionship = () => {
           <button className="btn" onClick={() => { bgmRef.current.play().catch(() => {}); userName ? setPhase('MODE_SELECT') : alert("ENTER NAME"); }}>START</button>
           <button className="btn" onClick={() => setPhase('SHOP')}>SHOP</button>
           <button className="btn" onClick={() => setPhase('TASKS')}>TASKS</button>
+          
+          {/* RANKING (VAI FICAR EMBAIXO NO MOBILE GRAÇAS AO CSS) */}
           <LeaderboardWidget />
         </div>
       )}
 
       {phase !== 'BATTLE' && phase !== 'TITLE' && <LeaderboardWidget />}
 
+      {/* OUTRAS TELAS MANTIDAS (TASKS, MODE_SELECT, LOBBY, SHOP, ARENA, WINNER) */}
+      {/* ... (O restante do código de renderização das telas permanece igual ao da V27) ... */}
+      
       {phase === 'TASKS' && (
         <div className="panel">
           <h2>DAILY TASKS</h2>
