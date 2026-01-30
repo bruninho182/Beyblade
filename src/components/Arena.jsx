@@ -320,12 +320,24 @@ const BeybladeChampionship = () => {
       return onValue(roomRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.val();
+          
+          // 1. Atualiza o estado do jogo com os dados do Firebase
           setGameState(prev => ({...prev, ...data}));
-          if (data.status === 'BATTLE' && phase !== 'BATTLE') setPhase('BATTLE');
+          
+          // 2. SINCRONIA DE LANÇAMENTO: 
+          // Se o P1 mudou o status para 'LAUNCH', o P2 inicia a contagem automaticamente
+          if (data.status === 'LAUNCH' && phase !== 'LAUNCH' && phase !== 'BATTLE') {
+              startBattleSequence();
+          }
+
+          // 3. Segurança para estados já em andamento
+          if (data.status === 'BATTLE' && phase !== 'BATTLE' && !isLaunching) {
+              setPhase('BATTLE');
+          }
         }
       });
     }
-  }, [mode, roomId, phase]);
+  }, [mode, roomId, phase, isLaunching, startBattleSequence]); // Adicionei isLaunching e a função aqui nas dependências
 
   const triggerGameAction = useCallback((key) => {
     const inputKey = key.toUpperCase();
@@ -967,11 +979,23 @@ const BeybladeChampionship = () => {
           </div>
           <p style={{fontSize: '10px', margin: '20px 0'}}>{gameState.status === 'LOBBY' ? "WAITING FOR OPPONENT..." : "OPPONENT READY!"}</p>
           {myRole === 'p1' && gameState.status === 'READY' && (
-            <button className="btn" onClick={() => {
-              update(ref(db, 'rooms/' + roomId), { status: 'BATTLE', winner: null, clashPos: 0, battleTime: 0, rpmP1: 50, rpmP2: 50, ultP1: 0, ultP2: 0 });
-              setPhase('BATTLE');
-            }}>START BATTLE</button>
-          )}
+  <button className="btn" onClick={() => {
+    // 1. Avisa o Firebase que a fase de LANÇAMENTO começou
+    update(ref(db, 'rooms/' + roomId), { 
+      status: 'LAUNCH', 
+      winner: null, 
+      clashPos: 0, 
+      battleTime: 0, 
+      rpmP1: 60, 
+      rpmP2: 60, 
+      ultP1: 0, 
+      ultP2: 0 
+    });
+    
+    // 2. O Player 1 também inicia a contagem localmente
+    startBattleSequence();
+  }}>START BATTLE</button>
+)}
           <button className="btn" onClick={() => setPhase('TITLE')}>CANCEL</button>
         </div>
       )}
