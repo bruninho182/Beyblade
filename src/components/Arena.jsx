@@ -144,7 +144,37 @@ const BeybladeChampionship = () => {
     }, 3000);
   };
 
-  
+  // --- ESSA É A NOVA FUNÇÃO QUE CONTROLA O LANÇAMENTO ---
+  const startBattleSequence = useCallback(() => {
+    // 1. Prepara o cenário
+    setIsLaunching(true); 
+    setCountdown(3);
+    
+    // 2. Cronômetro de 3 segundos
+    setTimeout(() => setCountdown(2), 1000);
+    setTimeout(() => setCountdown(1), 2000);
+    
+    // 3. O momento do lançamento
+    setTimeout(() => {
+      setCountdown("LET IT RIP!");
+      setIsLaunching(false); // Faz as beys dispararem para o centro
+      
+      // Define os estados iniciais da batalha
+      setPhase('BATTLE');
+      setGameState(s => ({
+        ...s, 
+        status: 'BATTLE', 
+        battleTime: 0, 
+        clashPos: 0, 
+        winner: null,
+        rpmP1: 50, // Começam com um giro inicial
+        rpmP2: 50
+      }));
+    }, 3000);
+
+    // 4. Limpa o texto da tela após o grito
+    setTimeout(() => setCountdown(null), 4500);
+  }, [mode]); // 'mode' aqui garante que ela funcione tanto online quanto offline
 
   useEffect(() => {
     localStorage.setItem('bey_stats', JSON.stringify(stats));
@@ -985,7 +1015,7 @@ const BeybladeChampionship = () => {
         <div className="panel">
           <h2>ARENA</h2>
           {Object.keys(arenas).map(id => (
-            <button key={id} className="btn" style={{borderColor: arenas[id].color}} onClick={() => { setArenaType(id); setPhase('BATTLE'); setGameState(s => ({...s, status: 'BATTLE', battleTime: 0, clashPos: 0, winner: null})); }}>{arenas[id].name}</button>
+            <button key={id} className="btn" style={{borderColor: arenas[id].color}} onClick={() => { setArenaType(id); startBattleSequence(); setGameState(s => ({...s, status: 'BATTLE', battleTime: 0, clashPos: 0, winner: null})); }}>{arenas[id].name}</button>
           ))}
         </div>
       )}
