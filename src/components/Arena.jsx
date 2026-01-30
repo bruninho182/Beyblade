@@ -159,9 +159,20 @@ const BeybladeChampionship = () => {
     setTimeout(() => {
       setCountdown("LET IT RIP!");
       setIsLaunching(false); // Faz as beys dispararem para o centro
+
+     // --- ATRASO UNIVERSAL (CPU E ONLINE) ---
+      setTimeout(() => {
+        setPhase('BATTLE'); 
+        
+        // Se for Online e você for o host, avisa o banco que a luta começou valendo
+        if (mode === 'ONLINE' && myRole === 'p1') {
+          update(ref(db, `rooms/${roomId}`), { status: 'BATTLE' });
+        }
+      }, 1000); // 1 segundo de impacto antes das teclas
+      // ---------------------------------------
       
       // Define os estados iniciais da batalha
-      setPhase('BATTLE');
+      
       setGameState(s => ({
         ...s, 
         status: 'BATTLE', 
@@ -173,9 +184,8 @@ const BeybladeChampionship = () => {
       }));
     }, 3000);
 
-    // 4. Limpa o texto da tela após o grito
     setTimeout(() => setCountdown(null), 4500);
-  }, []); // 'mode' aqui garante que ela funcione tanto online quanto offline
+  }, [mode, myRole, roomId]); // Adicionei as dependências para não bugar
 
   useEffect(() => {
     localStorage.setItem('bey_stats', JSON.stringify(stats));
