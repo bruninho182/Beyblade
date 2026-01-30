@@ -1,0 +1,15 @@
+.storeList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 4rem;
+  justify-content: space-between;
+  padding: 0 10em 0;
+}
+
+.beybladeCard:hover {
+  cursor: pointer;
+}
+
+.beybladeType {
+  font-size: smaller;
+}

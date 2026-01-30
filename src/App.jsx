@@ -1,7 +1,8 @@
-import React from 'react';
-import Arena from './components/Arena'; 
-import './App.css';
-import BeyPortal from './components/BeyPortal';
+import React from "react";
+import Arena from "./components/Arena";
+import "./App.css";
+import { Link } from "react-router";
+import BeyPortal from "./components/BeyPortal";
 
 function App() {
   // Detecta se a largura da tela é de uma janela pequena (Pop-up)
@@ -11,13 +12,13 @@ function App() {
   const openGameWindow = () => {
     const width = 1000;
     const height = 700;
-    const left = (window.screen.width / 2) - (width / 2);
-    const top = (window.screen.height / 2) - (height / 2);
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
 
     window.open(
-      '/', 
-      'BeyChampionGame',
-      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=no`
+      "/",
+      "BeyChampionGame",
+      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=no`,
     );
   };
 
@@ -38,7 +39,7 @@ function App() {
           <a href="#">NEWS</a>
           <a href="#">FORUM</a>
           <a href="#">RANKING</a>
-          <a href="#">SHOP</a>
+          <Link to={"/store"}>STORE</Link>
         </nav>
       </header>
 
@@ -54,8 +55,8 @@ function App() {
             </ul>
           </div>
           <div className="portal-box tournament-box">
-             <p className="blink">TOURNAMENT</p>
-             <p className="highlight">STARTS SOON!</p>
+            <p className="blink">TOURNAMENT</p>
+            <p className="highlight">STARTS SOON!</p>
           </div>
         </aside>
 
@@ -78,7 +79,7 @@ function App() {
             </div>
           </div>
           <div className="portal-box discord-promo">
-             <p>Join the discord for exclusive skins!</p>
+            <p>Join the discord for exclusive skins!</p>
           </div>
         </aside>
       </div>
