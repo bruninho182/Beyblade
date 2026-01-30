@@ -149,6 +149,7 @@ const BeybladeChampionship = () => {
     // 1. Prepara o cenário
     setIsLaunching(true); 
     setCountdown(3);
+    setPhase('LAUNCH');
     
     // 2. Cronômetro de 3 segundos
     setTimeout(() => setCountdown(2), 1000);
@@ -167,14 +168,14 @@ const BeybladeChampionship = () => {
         battleTime: 0, 
         clashPos: 0, 
         winner: null,
-        rpmP1: 50, // Começam com um giro inicial
-        rpmP2: 50
+        rpmP1: 60, 
+        rpmP2: 60
       }));
     }, 3000);
 
     // 4. Limpa o texto da tela após o grito
     setTimeout(() => setCountdown(null), 4500);
-  }, [mode]); // 'mode' aqui garante que ela funcione tanto online quanto offline
+  }, []); // 'mode' aqui garante que ela funcione tanto online quanto offline
 
   useEffect(() => {
     localStorage.setItem('bey_stats', JSON.stringify(stats));
@@ -776,10 +777,23 @@ const BeybladeChampionship = () => {
         </>
       )}
 
-      {(phase === 'BATTLE' || gameState.status === 'BATTLE') && (
-        <div className={`stadium ${gameState.battleTime >= 30 ? 'active-sd' : ''}`} style={{background: arenas[arenaType].bg, borderColor: arenas[arenaType].color}}>
-          {gameState.battleTime >= 30 && !gameState.winner && <div style={{position: 'absolute', top: '10px', color: 'red', zIndex:20}}>SUDDEN DEATH!</div>}
-          {!gameState.winner && <div className="qte-center">{gameState.targetKey}</div>}
+     {(phase === 'BATTLE' || phase === 'LAUNCH' || gameState.status === 'BATTLE') && (
+  <div className={`stadium ${gameState.battleTime >= 30 ? 'active-sd' : ''}`} 
+       style={{background: arenas[arenaType].bg, borderColor: arenas[arenaType].color}}>
+    
+    {/* HUD de Sudden Death - Só aparece na BATTLE real e se não estiver lançando */}
+    {phase === 'BATTLE' && gameState.battleTime >= 30 && !gameState.winner && !isLaunching && (
+      <div style={{position: 'absolute', top: '10px', color: 'red', zIndex: 20}}>
+        SUDDEN DEATH!
+      </div>
+    )}
+
+    {/* LETRA DE COMANDO (Target Key) - Escondida durante o 3, 2, 1 */}
+    {phase === 'BATTLE' && !gameState.winner && !isLaunching && (
+      <div className="qte-center">
+        {gameState.targetKey}
+      </div>
+    )}
 
           {/* MENSAGEM DE CONTAGEM (COLE AQUI) */}
     {countdown && (
@@ -804,6 +818,9 @@ const BeybladeChampionship = () => {
           {/* BEY PLAYER 1 */}
 <div className={`bey ${gameState.rpmP1 < 80 ? 'low-energy' : ''}`} 
      style={{ 
+
+      opacity: phase === 'LAUNCH' || phase === 'BATTLE' ? 1 : 0, // Invisível fora da luta
+      visibility: (isLaunching && countdown === null) ? 'hidden' : 'visible',
        /* Se estiver lançando, fica a 600px de distância; se não, usa a posição de combate */
        left: `calc(50% - ${isLaunching ? '600px' : (mode === 'ONLINE' || window.innerWidth < 900 ? '80px' : '100px')} + ${gameState.clashPos}px)`, 
        color: selectedBey.color,
@@ -814,6 +831,7 @@ const BeybladeChampionship = () => {
          ? 'none' 
          : 'left 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.1s ease-out',
        zIndex: p1Attacking ? 10 : 5
+
      }}>
   
   {gameState.rpmP1 < 60 && <div className="smoke-particle" style={{top: '-10px', left: '20px'}} />}
@@ -833,6 +851,8 @@ const BeybladeChampionship = () => {
 {/* BEY PLAYER 2 */}
 <div className={`bey ${gameState.rpmP2 < 80 ? 'low-energy' : ''}`} 
      style={{ 
+      opacity: phase === 'LAUNCH' || phase === 'BATTLE' ? 1 : 0, // Invisível fora da luta
+      visibility: (isLaunching && countdown === null) ? 'hidden' : 'visible',
        /* P2 vem do lado oposto (-600px na direita durante o lançamento) */
        right: `calc(50% - ${isLaunching ? '600px' : (mode === 'ONLINE' || window.innerWidth < 900 ? '80px' : '100px')} - ${gameState.clashPos}px)`, 
        color: '#ff4b2b',
@@ -1015,7 +1035,12 @@ const BeybladeChampionship = () => {
         <div className="panel">
           <h2>ARENA</h2>
           {Object.keys(arenas).map(id => (
-            <button key={id} className="btn" style={{borderColor: arenas[id].color}} onClick={() => { setArenaType(id); startBattleSequence(); setGameState(s => ({...s, status: 'BATTLE', battleTime: 0, clashPos: 0, winner: null})); }}>{arenas[id].name}</button>
+            <button key={id} className="btn" style={{borderColor: arenas[id].color}} onClick={() => { 
+        setArenaType(id); 
+        startBattleSequence(); // A função já cuida do setGameState e do Phase internamente
+        }}>
+        {arenas[id].name}
+        </button>
           ))}
         </div>
       )}
