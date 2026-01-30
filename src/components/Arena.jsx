@@ -20,17 +20,17 @@ const db = getDatabase(app);
 // --- 2. ASSETS ---
 const BATTLE_MUSIC_URL = "/music.mp3"; 
 const CLASH_SFX_URL = "/clash.mp3"; 
-// Som opcional para o Ultimate (Rugido)
 const ROAR_SFX_URL = "https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a"; 
 
 const BATTLE_MUSIC_FALLBACK = "https://commondatastorage.googleapis.com/codeskulptor-demos/riceracer_assets/music/race1.ogg";
 const CLASH_SFX_FALLBACK = "https://rpg.hamsterrepublic.com/wiki-images/2/21/Collision8-Bit.ogg";
 
 const BEY_SHOP = [
-  { id: 'p1', name: 'PEGASUS', color: '#00d4ff', price: 0, img: "beyblade.png" },
-  { id: 'p2', name: 'L-DRAGO', color: '#ff4b2b', price: 50, img: "beyblade2.png" },
-  { id: 'p3', name: 'LEONE', color: '#2ecc71', price: 100, img: "beyblade3.png" },
-  { id: 'p4', name: 'QUETZAL', color: '#f1c40f', price: 150, img: "beyblade4.png" },
+  { id: 'p1', name: 'PEGASUS', color: '#00d4ff', price: 0, rarity: 'COMMON', img: "beyblade.png" },
+  { id: 'p2', name: 'L-DRAGO', color: '#ff4b2b', price: 50, rarity: 'COMMON', img: "beyblade2.png" },
+  { id: 'p3', name: 'LEONE', color: '#2ecc71', price: 100, rarity: 'RARE', img: "beyblade3.png" },
+  { id: 'p4', name: 'QUETZAL', color: '#f1c40f', price: 150, rarity: 'RARE', img: "beyblade4.png" },
+  { id: 'p5', name: 'GOLD DRAGOON', color: '#ffd700', price: 9999, rarity: 'LEGENDARY', img: "beyblade.png" },
 ];
 
 const arenas = {
@@ -70,20 +70,21 @@ const BeybladeChampionship = () => {
   const [isKOFlash, setIsKOFlash] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   
-  // Refs
+  const [gachaAnimating, setGachaAnimating] = useState(false);
+  const [gachaResult, setGachaResult] = useState(null);
+  
   const bgmRef = useRef(new Audio(BATTLE_MUSIC_URL));
   const sfxRef = useRef(new Audio(CLASH_SFX_URL));
-  const roarRef = useRef(new Audio(ROAR_SFX_URL)); // Som do Ultimate
+  const roarRef = useRef(new Audio(ROAR_SFX_URL));
   const winnerProcessedRef = useRef(false);
 
-  // Estados locais para animação da Fera-Bit (Cut-in)
   const [showBeastP1, setShowBeastP1] = useState(false);
   const [showBeastP2, setShowBeastP2] = useState(false);
 
   const [gameState, setGameState] = useState({
     rpmP1: 50, rpmP2: 50,
-    ultP1: 0, ultP2: 0, // NOVOS ESTADOS DE ULTIMATE (0 a 100)
-    lastUltP1: 0, lastUltP2: 0, // Carimbos de tempo para disparar animação
+    ultP1: 0, ultP2: 0,
+    lastUltP1: 0, lastUltP2: 0,
     clashPos: 0, 
     targetKey: 'A',
     status: 'LOBBY', 
@@ -95,7 +96,40 @@ const BeybladeChampionship = () => {
     battleTime: 0
   });
 
-  // --- SINCRONIZAÇÃO E RANKING ---
+  // --- FUNÇÃO PARA VIBRAÇÃO (HAPTIC) ---
+  const triggerHaptic = (duration = 50) => {
+    if (navigator.vibrate) navigator.vibrate(duration);
+  };
+
+  const rollGacha = () => {
+    if (stats.coins < 100) return alert("MOEDAS INSUFICIENTES (100💰)");
+    
+    setStats(prev => ({...prev, coins: prev.coins - 100}));
+    setGachaAnimating(true);
+    setPhase('GACHA_REVEAL');
+
+    setTimeout(() => {
+        const roll = Math.random();
+        let item;
+        if (roll < 0.05) item = BEY_SHOP.find(b => b.rarity === 'LEGENDARY');
+        else if (roll < 0.40) item = BEY_SHOP.filter(b => b.rarity === 'RARE')[Math.floor(Math.random() * 2)];
+        else item = BEY_SHOP.filter(b => b.rarity === 'COMMON')[Math.floor(Math.random() * 2)];
+
+        let refund = false;
+        if (inventory.includes(item.id)) {
+            refund = true;
+            setStats(prev => ({...prev, coins: prev.coins + 50}));
+        } else {
+            setInventory(prev => [...prev, item.id]);
+        }
+
+        setGachaResult({ item, refund });
+        setGachaAnimating(false);
+        if (item.rarity === 'LEGENDARY') roarRef.current.play().catch(()=>{});
+
+    }, 3000);
+  };
+
   useEffect(() => {
     localStorage.setItem('bey_stats', JSON.stringify(stats));
     localStorage.setItem('bey_inv', JSON.stringify(inventory));
@@ -122,13 +156,11 @@ const BeybladeChampionship = () => {
     return () => unsubscribe();
   }, []);
 
-  // --- DETECTOR DE ANIMAÇÃO DE ULTIMATE ---
-  // Observa se o timestamp do ultimate mudou no banco de dados para tocar a animação
   useEffect(() => {
      if (gameState.lastUltP1 > 0) {
         setShowBeastP1(true);
         roarRef.current.play().catch(()=>{});
-        setTimeout(() => setShowBeastP1(false), 1500); // Fera some após 1.5s
+        setTimeout(() => setShowBeastP1(false), 1500);
      }
   }, [gameState.lastUltP1]);
 
@@ -140,7 +172,6 @@ const BeybladeChampionship = () => {
      }
   }, [gameState.lastUltP2]);
 
-  // JUIZ DE VITÓRIA
   useEffect(() => {
     if (!gameState.winner) winnerProcessedRef.current = false;
     else if (!winnerProcessedRef.current && userName) {
@@ -155,7 +186,6 @@ const BeybladeChampionship = () => {
     }
   }, [gameState.winner, userName]);
 
-  // ÁUDIO SETUP
   useEffect(() => {
     bgmRef.current.onerror = () => { bgmRef.current.src = BATTLE_MUSIC_FALLBACK; };
     sfxRef.current.onerror = () => { sfxRef.current.src = CLASH_SFX_FALLBACK; };
@@ -238,23 +268,21 @@ const BeybladeChampionship = () => {
     }
   }, [mode, roomId, phase]);
 
-  // --- CONTROLE DE INPUT (AGORA COM ULTIMATE) ---
-  const handleKey = useCallback((e) => {
-    if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
+  // --- TRATAMENTO UNIFICADO DE INPUT (TECLADO + MOBILE) ---
+  const triggerGameAction = useCallback((key) => {
+    const inputKey = key.toUpperCase();
 
-    // --- LÓGICA DO ULTIMATE (ESPAÇO) ---
-    if (e.code === 'Space') {
-       e.preventDefault(); // Não rolar a página
-       
+    // ULTIMATE
+    if (inputKey === 'SPACE' || inputKey === 'ULTIMATE') {
        if (myRole === 'p1' && gameState.ultP1 >= 100) {
-          // Dispara Ultimate P1
+          triggerHaptic(200);
           const updates = { ultP1: 0, rpmP1: Math.min(500, gameState.rpmP1 + 150), lastUltP1: Date.now() };
           if (mode === 'ONLINE') update(ref(db, `rooms/${roomId}`), updates);
           else setGameState(prev => ({ ...prev, ...updates }));
           return;
        }
        if (myRole === 'p2' && gameState.ultP2 >= 100 && mode === 'ONLINE') {
-          // Dispara Ultimate P2
+          triggerHaptic(200);
           const updates = { ultP2: 0, rpmP2: Math.min(500, gameState.rpmP2 + 150), lastUltP2: Date.now() };
           update(ref(db, `rooms/${roomId}`), updates);
           return;
@@ -262,14 +290,15 @@ const BeybladeChampionship = () => {
        return;
     }
     
-    // --- LÓGICA NORMAL (CLIQUE NA LETRA) ---
+    // GOLPE NORMAL
     setGameState(prev => {
-      if (e.key.toUpperCase() === prev.targetKey) {
+      if (inputKey === prev.targetKey) {
+        triggerHaptic(50); // Vibra rapidinho no celular
         addSparks(prev.clashPos);
         playClashSound();
         const power = prev.battleTime >= 30 ? 45 : 25;
         const nextKey = generateLetter();
-        const ultCharge = 15; // Quanto carrega por acerto (aprox 7 acertos = full)
+        const ultCharge = 15;
 
         if (mode === 'ONLINE') {
           const updates = {};
@@ -290,7 +319,6 @@ const BeybladeChampionship = () => {
              targetKey: nextKey
           };
         } else {
-          // Modo CPU
           return { 
              ...prev, 
              rpmP1: Math.min(400, prev.rpmP1 + power), 
@@ -301,14 +329,19 @@ const BeybladeChampionship = () => {
       }
       return prev;
     });
-  }, [phase, gameState, gameState.winner, mode, myRole, roomId, generateLetter, addSparks, playClashSound]);
+  }, [gameState, mode, myRole, roomId, generateLetter, addSparks, playClashSound]);
+
+  const handleKey = useCallback((e) => {
+    if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
+    if (e.code === 'Space') { e.preventDefault(); triggerGameAction('SPACE'); }
+    else { triggerGameAction(e.key); }
+  }, [phase, gameState.status, gameState.winner, triggerGameAction]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
-  // FÍSICA HOST
   useEffect(() => {
     if (mode === 'ONLINE' && myRole !== 'p1') return;
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
@@ -353,7 +386,6 @@ const BeybladeChampionship = () => {
     return () => clearInterval(interval);
   }, [mode, myRole, phase, gameState.status, gameState.winner, roomId, arenaType]);
 
-  // FÍSICA GUEST
   useEffect(() => {
     if (mode !== 'ONLINE' || myRole !== 'p2') return;
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
@@ -400,7 +432,7 @@ const BeybladeChampionship = () => {
     <div className={`game-root ${getShakeClass()}`}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        .game-root { position: fixed; inset: 0; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+        .game-root { position: fixed; inset: 0; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
         .shake-soft { animation: shakeEffect 0.12s infinite; }
         .shake-hard { animation: shakeEffect 0.08s infinite; background: #2a0000 !important; }
         .shake-sd { animation: shakeEffect 0.1s infinite; background: #1a0000 !important; }
@@ -410,24 +442,14 @@ const BeybladeChampionship = () => {
         
         .hud-battle { position: absolute; top: 35px; display: flex; align-items: center; gap: 20px; z-index: 10; width: 100%; justify-content: center; }
         .timer { font-size: 12px; padding: 8px; border: 2px solid #fff; background: #000; min-width: 50px; text-align: center; }
-        
-        /* BARRA DE VIDA (RPM) */
         .bar-outer { width: 200px; height: 14px; background: #111; border: 3px solid #fff; transform: skewX(-15deg); overflow: hidden; margin-bottom: 5px; }
         .bar-fill { height: 100%; transition: width 0.1s linear; }
-        
-        /* BARRA DE ULTIMATE (NOVA) */
         .ult-bar { width: 150px; height: 6px; background: #333; border: 2px solid #666; transform: skewX(-15deg); overflow: hidden; margin: 0 auto; position: relative; }
         .ult-fill { height: 100%; background: linear-gradient(90deg, #ffd700, #ffaa00); transition: width 0.2s; }
         .ult-ready { box-shadow: 0 0 10px #ffd700; animation: pulseUlt 0.5s infinite alternate; }
         @keyframes pulseUlt { from { filter: brightness(1); } to { filter: brightness(1.5); } }
 
-        /* ANIMAÇÃO DA FERA-BIT (CUT-IN) */
-        .beast-cutin { 
-          position: fixed; inset: 0; z-index: 200; pointer-events: none; 
-          display: flex; align-items: center; justify-content: center;
-          background: rgba(0,0,0,0.5);
-          animation: slideIn 0.3s ease-out;
-        }
+        .beast-cutin { position: fixed; inset: 0; z-index: 200; pointer-events: none; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; }
         .beast-img { width: 300px; height: 300px; filter: drop-shadow(0 0 20px cyan) brightness(1.5); animation: zoomBeast 1.5s forwards; }
         @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
         @keyframes zoomBeast { 0% { transform: scale(0.5); opacity: 0; } 20% { transform: scale(1.2); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
@@ -444,11 +466,46 @@ const BeybladeChampionship = () => {
         
         .leaderboard-container { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; padding: 10px; width: 150px; z-index: 50; max-height: 80vh; overflow-y: auto; }
         @media (max-width: 768px) { .leaderboard-container { position: static; transform: none; width: 90vw; margin: 10px auto; order: 2; } .game-root { overflow-y: auto; } }
+
+        .gacha-box { width: 100px; height: 100px; background: #333; border: 4px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 20px; animation: gachaShake 0.5s infinite; }
+        @keyframes gachaShake { 0% { transform: rotate(0deg); } 25% { transform: rotate(5deg); } 75% { transform: rotate(-5deg); } 100% { transform: rotate(0deg); } }
+        .rarity-LEGENDARY { color: #ffd700; text-shadow: 0 0 10px #ffd700; animation: pulseUlt 1s infinite; }
+        .rarity-RARE { color: #2ecc71; }
+        .rarity-COMMON { color: #fff; }
+
+        /* CONTROLES MOBILE */
+        .mobile-controls {
+           position: fixed; bottom: 20px; width: 100%; display: none; flex-direction: column; align-items: center; z-index: 500;
+        }
+        .mobile-grid {
+           display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;
+        }
+        .mob-btn {
+           width: 60px; height: 60px; background: rgba(255, 255, 255, 0.1); border: 2px solid #fff; 
+           border-radius: 10px; color: #fff; font-family: 'Press Start 2P'; font-size: 20px;
+           display: flex; align-items: center; justify-content: center; user-select: none;
+        }
+        .mob-btn:active { background: #fff; color: #000; }
+        
+        .ult-btn-mobile {
+            width: 90%; height: 50px; background: linear-gradient(90deg, #ffd700, #ffaa00); border: 3px solid #fff;
+            color: #000; font-family: 'Press Start 2P'; font-size: 16px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; border-radius: 10px; user-select: none;
+            box-shadow: 0 0 15px #ffd700;
+        }
+        .ult-btn-mobile:active { transform: scale(0.95); }
+
+        /* MOSTRAR CONTROLES APENAS EM TELAS PEQUENAS */
+        @media (max-width: 768px) {
+           .mobile-controls { display: flex; }
+           .stadium { height: 35vh; margin-top: -20%; } /* Sobe a arena pra caber os botões */
+           .hud-battle { top: 10px; }
+        }
       `}</style>
 
       {isKOFlash && <div className="ko-flash" />}
 
-      {/* ANIMAÇÃO DA FERA (CUT-IN) */}
+      {/* CUT-INS DE ULTIMATE */}
       {showBeastP1 && (
          <div className="beast-cutin" style={{justifyContent: 'flex-start', paddingLeft: '50px'}}>
              <img src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} className="beast-img" style={{filter: `drop-shadow(0 0 20px ${selectedBey.color}) brightness(1.5)`}} />
@@ -463,30 +520,43 @@ const BeybladeChampionship = () => {
       )}
 
       {(phase === 'BATTLE' || gameState.status === 'BATTLE') && !gameState.winner && (
+        <>
         <div className="hud-battle">
           <div style={{textAlign: 'center'}}>
             <div style={{fontSize: '8px', color: '#f1c40f', marginBottom: '4px'}}>{gameState.nameP1}</div>
             <div className="bar-outer"><div className="bar-fill" style={{ width: `${(gameState.rpmP1/300)*100}%`, background: selectedBey.color }} /></div>
-            {/* BARRA ULTIMATE P1 */}
             <div className={`ult-bar ${gameState.ultP1 >= 100 ? 'ult-ready' : ''}`}>
                <div className="ult-fill" style={{width: `${gameState.ultP1}%`}} />
             </div>
-            {gameState.ultP1 >= 100 && myRole === 'p1' && <div style={{fontSize:'8px', color:'#ffd700', marginTop:'2px', animation:'pulseUlt 0.2s infinite'}}>PRESS SPACE!</div>}
           </div>
-
           <div className="timer" style={{ borderColor: gameState.battleTime >= 30 ? '#ff0000' : '#fff', color: gameState.battleTime >= 30 ? '#ff0000' : '#fff' }}>
             {Math.floor(gameState.battleTime)}s
           </div>
-
           <div style={{textAlign: 'center'}}>
             <div style={{fontSize: '8px', color: '#ff4b2b', marginBottom: '4px'}}>{gameState.nameP2}</div>
             <div className="bar-outer" style={{ transform: 'skewX(15deg)' }}><div className="bar-fill" style={{ width: `${(gameState.rpmP2/300)*100}%`, background: '#ff4b2b' }} /></div>
-            {/* BARRA ULTIMATE P2 */}
             <div className={`ult-bar ${gameState.ultP2 >= 100 ? 'ult-ready' : ''}`} style={{transform: 'skewX(15deg)'}}>
                <div className="ult-fill" style={{width: `${gameState.ultP2}%`, background: 'linear-gradient(90deg, #ff4b2b, #ff0000)'}} />
             </div>
           </div>
         </div>
+
+        {/* CONTROLES MOBILE (SÓ APARECEM NO CELULAR) */}
+        <div className="mobile-controls">
+           <div className="mobile-grid">
+               {['L','U','R','X','A','B','Y','D','N'].map(key => (
+                  <div key={key} className="mob-btn" onTouchStart={(e) => { e.preventDefault(); triggerGameAction(key); }}>
+                      {key}
+                  </div>
+               ))}
+           </div>
+           <div className={`ult-btn-mobile ${gameState.ultP1 >= 100 ? 'ult-ready' : ''}`} 
+                style={{opacity: gameState.ultP1 >= 100 ? 1 : 0.5}}
+                onTouchStart={(e) => { e.preventDefault(); triggerGameAction('SPACE'); }}>
+               ULTIMATE BURST!
+           </div>
+        </div>
+        </>
       )}
 
       {(phase === 'BATTLE' || gameState.status === 'BATTLE') && (
@@ -495,7 +565,7 @@ const BeybladeChampionship = () => {
           {!gameState.winner && <div className="qte-center">{gameState.targetKey}</div>}
           
           <div className="bey" style={{ left: `calc(50% - 80px + ${gameState.clashPos}px)`, color: selectedBey.color }}>
-            <img src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} width="100%" alt="P1" style={{ transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)` }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+            <img src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} width="100%" alt="P1" style={{ transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)`, filter: selectedBey.rarity === 'LEGENDARY' ? 'sepia(100%) hue-rotate(5deg) saturate(300%)' : 'none' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             <div className="bey-fallback" style={{display: 'none', borderColor: selectedBey.color, transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)`}}>P1</div>
             {gameState.battleTime >= 30 && <Lightning bolColor="#00d4ff" />}
           </div>
@@ -512,7 +582,30 @@ const BeybladeChampionship = () => {
         </div>
       )}
 
-      {/* RESTO DOS MENUS (IGUAL AO ANTERIOR) */}
+      {/* MENUS (GACHA, TITLE, SHOP, LOBBY, ETC) - CÓDIGO IDÊNTICO AO ANTERIOR */}
+      {/* ... (Por brevidade, assume-se que as telas de menu continuam iguais às da V25) ... */}
+      
+      {phase === 'GACHA_REVEAL' && (
+        <div className="panel">
+            {gachaAnimating ? (
+                <div>
+                    <h2>OPENING...</h2>
+                    <div className="gacha-box">?</div>
+                    <p>Good Luck!</p>
+                </div>
+            ) : (
+                <div>
+                    <h2 className={`rarity-${gachaResult.item.rarity}`}>{gachaResult.item.rarity} PULL!</h2>
+                    <img src={gachaResult.item.img} width="80" style={{margin:'20px', filter: gachaResult.item.rarity === 'LEGENDARY' ? 'sepia(100%) hue-rotate(5deg) saturate(300%)' : 'none'}} />
+                    <h3 style={{color: gachaResult.item.color}}>{gachaResult.item.name}</h3>
+                    {gachaResult.refund ? <p style={{color: '#f1c40f', marginTop: '10px'}}>DUPLICATE! REFUND: +50💰</p> : <p style={{color: '#00ff00', marginTop: '10px'}}>NEW BEYBLADE ACQUIRED!</p>}
+                    <button className="btn" onClick={() => setPhase('SHOP')}>OK</button>
+                    <button className="btn" onClick={() => rollGacha()}>TRY AGAIN (100💰)</button>
+                </div>
+            )}
+        </div>
+      )}
+
       {phase === 'TITLE' && (
         <div className="panel">
           <h1 style={{color: '#f1c40f', fontSize: '20px', marginBottom: '20px'}}>BEY-CHAMPION</h1>
@@ -596,15 +689,23 @@ const BeybladeChampionship = () => {
       {phase === 'SHOP' && (
         <div className="panel">
           <h2>SHOP (💰{stats.coins})</h2>
+          <div style={{border: '2px solid #f1c40f', padding: '10px', marginBottom: '20px', background: 'rgba(255, 215, 0, 0.1)'}}>
+             <h3 style={{color: '#f1c40f', fontSize: '12px'}}>MYSTERY BOX</h3>
+             <p style={{fontSize: '8px', marginBottom: '10px'}}>Chance for LEGENDARY!</p>
+             <button className="btn" style={{background: '#f1c40f', color: '#000', fontWeight: 'bold'}} onClick={rollGacha}>
+                OPEN (100💰)
+             </button>
+          </div>
           <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', margin: '15px 0'}}>
             {BEY_SHOP.map(b => (
-              <div key={b.id} style={{border: '1px solid #444', padding: '10px'}}>
-                <img src={b.img} width="40" alt={b.name} onError={(e) => e.target.style.opacity = '0.3'} />
-                <p style={{fontSize: '8px'}}>${b.price}</p>
+              <div key={b.id} style={{border: `1px solid ${b.rarity === 'LEGENDARY' ? '#ffd700' : '#444'}`, padding: '10px', opacity: inventory.includes(b.id) ? 1 : 0.6}}>
+                <img src={b.img} width="40" alt={b.name} style={{filter: b.rarity === 'LEGENDARY' ? 'sepia(100%) hue-rotate(5deg) saturate(300%)' : 'none'}} onError={(e) => e.target.style.opacity = '0.3'} />
+                <p style={{fontSize: '8px', color: b.color}}>{b.name}</p>
                 {inventory.includes(b.id) ? 
                   <button className="btn" onClick={() => { setSelectedBey(b); setGameState(s => ({...s, skinP1: b.img})); setPhase('TITLE'); }}>SELECT</button> :
-                  <button className="btn" onClick={() => stats.coins >= b.price && (setStats(s => ({...s, coins: s.coins - b.price})) || setInventory(i => [...i, b.id]))}>BUY</button>
+                  <p style={{fontSize: '8px', marginTop: '5px'}}>{b.price > 1000 ? "GACHA ONLY" : `${b.price}💰`}</p>
                 }
+                {!inventory.includes(b.id) && b.price < 1000 && <button className="btn" onClick={() => stats.coins >= b.price && (setStats(s => ({...s, coins: s.coins - b.price})) || setInventory(i => [...i, b.id]))}>BUY</button>}
               </div>
             ))}
           </div>
