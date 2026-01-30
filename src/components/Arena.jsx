@@ -80,8 +80,11 @@ const BeybladeChampionship = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [isSlowMo, setIsSlowMo] = useState(false);
 
+  const [countdown, setCountdown] = useState(null); // Pode ser 3, 2, 1, "LET IT RIP!"
+  const [isLaunching, setIsLaunching] = useState(false); // Controla a animação de entrada
+
   const [p1Attacking, setP1Attacking] = useState(false);
-const [p2Attacking, setP2Attacking] = useState(false);
+  const [p2Attacking, setP2Attacking] = useState(false);
   
   const [gachaAnimating, setGachaAnimating] = useState(false);
   const [gachaResult, setGachaResult] = useState(null);
@@ -140,6 +143,8 @@ const [p2Attacking, setP2Attacking] = useState(false);
         if (item.rarity === 'LEGENDARY') roarRef.current.play().catch(()=>{});
     }, 3000);
   };
+
+  
 
   useEffect(() => {
     localStorage.setItem('bey_stats', JSON.stringify(stats));
@@ -650,6 +655,24 @@ const [p2Attacking, setP2Attacking] = useState(false);
            .leaderboard-container { position: static; transform: none; width: 90%; margin: 10px auto; order: 10; max-height: 120px; }
            .game-root { display: flex; flex-direction: column; overflow-y: auto; justify-content: flex-start; padding-top: 20px; }
         }
+
+        /* Animação para o texto da contagem pulsar */
+@keyframes pulseCount {
+  from { 
+    transform: translate(-50%, -50%) scale(1); 
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+  to { 
+    transform: translate(-50%, -50%) scale(1.2); 
+    text-shadow: 0 0 30px rgba(255, 215, 0, 1), 2px 2px #000;
+  }
+}
+
+/* Animação para as letras do Especial (Aperte Espaço) */
+@keyframes pulseUlt {
+  from { transform: scale(1); opacity: 0.8; }
+  to { transform: scale(1.1); opacity: 1; }
+}
       `}</style>
 
       {isKOFlash && <div className="ko-flash" />}
@@ -727,19 +750,42 @@ const [p2Attacking, setP2Attacking] = useState(false);
         <div className={`stadium ${gameState.battleTime >= 30 ? 'active-sd' : ''}`} style={{background: arenas[arenaType].bg, borderColor: arenas[arenaType].color}}>
           {gameState.battleTime >= 30 && !gameState.winner && <div style={{position: 'absolute', top: '10px', color: 'red', zIndex:20}}>SUDDEN DEATH!</div>}
           {!gameState.winner && <div className="qte-center">{gameState.targetKey}</div>}
+
+          {/* MENSAGEM DE CONTAGEM (COLE AQUI) */}
+    {countdown && (
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        fontSize: '48px',
+        color: '#ffd700',
+        fontFamily: '"Press Start 2P", cursive',
+        textShadow: '0 0 20px rgba(255, 215, 0, 0.8), 2px 2px #000',
+        zIndex: 1000, // Garante que fica na frente de tudo
+        textAlign: 'center',
+        pointerEvents: 'none', // Não atrapalha os cliques
+        animation: 'pulseCount 0.5s infinite alternate'
+      }}>
+        {countdown}
+      </div>
+    )}
           
           {/* BEY PLAYER 1 */}
 <div className={`bey ${gameState.rpmP1 < 80 ? 'low-energy' : ''}`} 
      style={{ 
-       left: `calc(50% - ${mode === 'ONLINE' || window.innerWidth < 900 ? '80px' : '100px'} + ${gameState.clashPos}px)`, 
+       /* Se estiver lançando, fica a 600px de distância; se não, usa a posição de combate */
+       left: `calc(50% - ${isLaunching ? '600px' : (mode === 'ONLINE' || window.innerWidth < 900 ? '80px' : '100px')} + ${gameState.clashPos}px)`, 
        color: selectedBey.color,
-       /* EFEITO DE BOTE: Avança 30px para a direita quando p1Attacking é true */
+       /* EFEITO DE BOTE: Avança 30px quando ataca */
        transform: `translateX(${p1Attacking ? '30px' : '0px'})`,
-       transition: 'transform 0.1s ease-out',
+       /* Transição dupla: uma para a entrada (left) e outra para o bote (transform) */
+       transition: isLaunching 
+         ? 'none' 
+         : 'left 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.1s ease-out',
        zIndex: p1Attacking ? 10 : 5
      }}>
   
-  {/* Fumaça (Mantida) */}
   {gameState.rpmP1 < 60 && <div className="smoke-particle" style={{top: '-10px', left: '20px'}} />}
   {gameState.rpmP1 < 60 && <div className="smoke-particle" style={{top: '-10px', left: '40px', animationDelay: '0.3s'}} />}
   
@@ -757,15 +803,16 @@ const [p2Attacking, setP2Attacking] = useState(false);
 {/* BEY PLAYER 2 */}
 <div className={`bey ${gameState.rpmP2 < 80 ? 'low-energy' : ''}`} 
      style={{ 
-       right: `calc(50% - ${mode === 'ONLINE' || window.innerWidth < 900 ? '80px' : '100px'} - ${gameState.clashPos}px)`, 
+       /* P2 vem do lado oposto (-600px na direita durante o lançamento) */
+       right: `calc(50% - ${isLaunching ? '600px' : (mode === 'ONLINE' || window.innerWidth < 900 ? '80px' : '100px')} - ${gameState.clashPos}px)`, 
        color: '#ff4b2b',
-       /* EFEITO DE BOTE: Avança 30px para a esquerda quando p2Attacking é true */
        transform: `translateX(${p2Attacking ? '-30px' : '0px'})`,
-       transition: 'transform 0.1s ease-out',
+       transition: isLaunching 
+         ? 'none' 
+         : 'right 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.1s ease-out',
        zIndex: p2Attacking ? 10 : 5
      }}>
   
-  {/* Fumaça (Mantida) */}
   {gameState.rpmP2 < 60 && <div className="smoke-particle" style={{top: '-10px', right: '20px'}} />}
   {gameState.rpmP2 < 60 && <div className="smoke-particle" style={{top: '-10px', right: '40px', animationDelay: '0.3s'}} />}
   
