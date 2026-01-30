@@ -80,11 +80,15 @@ const BeybladeChampionship = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [isSlowMo, setIsSlowMo] = useState(false);
 
+  const [combo, setCombo] = useState(0);
+
   const [countdown, setCountdown] = useState(null); // Pode ser 3, 2, 1, "LET IT RIP!"
   const [isLaunching, setIsLaunching] = useState(false); // Controla a animação de entrada
 
   const [p1Attacking, setP1Attacking] = useState(false);
   const [p2Attacking, setP2Attacking] = useState(false);
+
+  const [isCounterActive, setIsCounterActive] = useState(false);
   
   const [gachaAnimating, setGachaAnimating] = useState(false);
   const [gachaResult, setGachaResult] = useState(null);
@@ -276,7 +280,7 @@ const BeybladeChampionship = () => {
   const addSparks = useCallback((pos, isPerfect, isUltimate = false) => {
     const isSD = gameState.battleTime >= 30;
     // Se for Ultimate, gera MUITO mais faíscas (50 faíscas!)
-    const count = isUltimate ? 50 : (isPerfect ? 20 : (isSD ? 12 : 8)); 
+    const count = isUltimate ? 50 : (isPerfect ? 20 : 8) + (combo * 2);
     
     // Ajuste fino para o vão entre as beys
     const centerX = 50 + (pos / 14); 
@@ -379,6 +383,13 @@ const BeybladeChampionship = () => {
       if (inputKey === prev.targetKey) {
         const reactionTime = Date.now() - keyAppearTimeRef.current;
         const isPerfect = reactionTime < 400; 
+        const isCounter = reactionTime < 200; // NOVO: Timing de Contra-ataque
+
+  
+        if (isCounter) {
+            setIsCounterActive(true);
+            setTimeout(() => setIsCounterActive(false), 100); // Brilha por 0.1s
+        }
 
         // --- 1. ATIVAR ANIMAÇÃO DE BOTE (DASH) ---
         if (myRole === 'p1') {
@@ -396,21 +407,40 @@ const BeybladeChampionship = () => {
         }
 
         setHitFeedback({
-           text: isPerfect ? "PERFECT!" : "GOOD",
-           color: isPerfect ? "#ffd700" : "#fff",
-           scale: isPerfect ? 1.5 : 1.0,
+           text: isCounter ? "COUNTER!!" : (isPerfect ? "PERFECT!" : "GOOD"),
+           color: isCounter ? "#00ffff" : (isPerfect ? "#ffd700" : "#fff"),
+           scale: isCounter ? 2.0 : (isPerfect ? 1.5 : 1.0),
            id: Date.now()
         });
         setTimeout(() => setHitFeedback(null), 500); 
 
         addSparks(prev.clashPos, isPerfect);
         playClashSound(isPerfect);
+
+        // --- SISTEMA DE COMBO CORRIGIDO ---
+        let newCombo;
+        setCombo(c => {
+          console.log(c)
+          newCombo = c + 1; // Calculamos o valor futuro
+          console.log(newCombo)
+          return newCombo;
+        });
+
+        // O bônus agora é calculado sobre o valor REAL do acerto
+        // Usamos (combo + 1) aqui porque 'combo' ainda reflete o valor antigo
+        let comboBonus = Math.floor((combo + 1) / 5) * 5;
         
         let basePower = prev.battleTime >= 30 ? 45 : 25;
         const attackFactor = selectedBey.power || 1.0; 
-        let power = (isPerfect ? basePower * 1.5 : basePower) * attackFactor;
-        let knockback = isPerfect ? (15 * attackFactor) : 0; 
-        let ultCharge = isPerfect ? 25 : 15; 
+
+        let powerMultiplier = isCounter ? 3.0 : (isPerfect ? 1.5 : 1.0);
+        let power = ((basePower * powerMultiplier) + comboBonus) * attackFactor;
+
+        
+
+        let knockback = isCounter ? (40 * attackFactor) : (isPerfect ? (15 * attackFactor) : 0); 
+        let ultCharge = isCounter ? 40 : (isPerfect ? 25 : 15);
+        
 
         const nextKey = generateLetter();
 
@@ -436,8 +466,12 @@ const BeybladeChampionship = () => {
            clashPos: myRole === 'p1' ? prev.clashPos + knockback : prev.clashPos - knockback,
            targetKey: nextKey
         };
-      }
+      } else {
+        // --- ADICIONE ISSO PARA O COMBO FUNCIONAR DIREITO ---
+        // Se errar a tecla, o combo zera e o oponente ganha vantagem
+        setCombo(0);
       return prev;
+      }
     });
   }, [gameState, mode, myRole, roomId, generateLetter, addSparks, playClashSound]);
 
@@ -459,7 +493,7 @@ const BeybladeChampionship = () => {
     const interval = setInterval(() => {
       setGameState(prev => {
 
-        
+        let cpuCounterChance = Math.random() > 0.98; // 2% de chance da CPU dar um Counter
 
         const isSD = prev.battleTime >= 30;
         const drain = arenas[arenaType].drain * (isSD ? 2.2 : 1.0);
@@ -730,6 +764,23 @@ const BeybladeChampionship = () => {
 
       {isKOFlash && <div className="ko-flash" />}
 
+        {combo > 1 && (
+        <div style={{
+          position: 'absolute',
+          top: '25%', // Ajustado para não bater no HUD
+          left: '10%',
+          fontSize: combo > 10 ? '24px' : '18px',
+          color: combo > 10 ? '#ff4500' : '#f1c40f',
+          textShadow: '3px 3px #000',
+          fontFamily: "'Press Start 2P', cursive", // Garante a fonte de jogo
+          animation: 'pulseCount 0.2s infinite alternate',
+          zIndex: 200, // Na frente de tudo
+          pointerEvents: 'none'
+        }}>
+          COMBO X{combo}
+        </div>
+      )}
+
       {hitFeedback && (
           <div className="hit-feedback" style={{color: hitFeedback.color, transform: `translateX(-50%) scale(${hitFeedback.scale})`}}>
               {hitFeedback.text}
@@ -841,6 +892,9 @@ const BeybladeChampionship = () => {
 <div className={`bey ${gameState.rpmP1 < 80 ? 'low-energy' : ''}`} 
      style={{ 
 
+      boxShadow: isCounterActive ? `0 0 30px #00ffff` : 'none', 
+      filter: isCounterActive ? 'brightness(2)' : 'none',
+
       opacity: phase === 'LAUNCH' || phase === 'BATTLE' ? 1 : 0, // Invisível fora da luta
       visibility: (isLaunching && countdown === null) ? 'hidden' : 'visible',
        /* Se estiver lançando, fica a 600px de distância; se não, usa a posição de combate */
@@ -873,6 +927,9 @@ const BeybladeChampionship = () => {
 {/* BEY PLAYER 2 */}
 <div className={`bey ${gameState.rpmP2 < 80 ? 'low-energy' : ''}`} 
      style={{ 
+      boxShadow: isCounterActive ? `0 0 30px #00ffff` : 'none', 
+      filter: isCounterActive ? 'brightness(2)' : 'none',
+
       opacity: phase === 'LAUNCH' || phase === 'BATTLE' ? 1 : 0, // Invisível fora da luta
       visibility: (isLaunching && countdown === null) ? 'hidden' : 'visible',
        /* P2 vem do lado oposto (-600px na direita durante o lançamento) */
