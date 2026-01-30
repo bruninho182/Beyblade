@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set, update, get, query, orderByChild, limitToLast } from "firebase/database";
 
-// --- 1. CONFIGURAÇÃO ---
+// --- 1. CONFIGURAÇÃO (MANTIDA) ---
 const firebaseConfig = {
   apiKey: "AIzaSyABAyy8d3qmzJ1gR0M9ykwUstyT2K71Kns",
   authDomain: "beybladeonline.firebaseapp.com",
@@ -18,7 +18,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // --- 2. ASSETS ---
-const BATTLE_MUSIC_URL = "/battlesong.mp3"; 
+const BATTLE_MUSIC_URL = "/music.mp3"; 
 const CLASH_SFX_URL = "/clash.mp3"; 
 const ROAR_SFX_URL = "https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a"; 
 
@@ -26,12 +26,21 @@ const BATTLE_MUSIC_FALLBACK = "https://commondatastorage.googleapis.com/codeskul
 const CLASH_SFX_FALLBACK = "https://rpg.hamsterrepublic.com/wiki-images/2/21/Collision8-Bit.ogg";
 
 const BEY_SHOP = [
-  { id: 'p1', name: 'PEGASUS', color: '#00d4ff', price: 0, rarity: 'COMMON', img: "beyblade.png" },
-  { id: 'p2', name: 'L-DRAGO', color: '#ff4b2b', price: 50, rarity: 'COMMON', img: "beyblade2.png" },
-  { id: 'p3', name: 'LEONE', color: '#2ecc71', price: 100, rarity: 'RARE', img: "beyblade3.png" },
-  { id: 'p4', name: 'QUETZAL', color: '#f1c40f', price: 150, rarity: 'RARE', img: "beyblade4.png" },
-  { id: 'p5', name: 'GOLD DRAGOON', color: '#ffd700', price: 9999, rarity: 'LEGENDARY', img: "beyblade.png" },
+  { id: 'p1', name: 'PEGASUS', color: '#00d4ff', price: 0, rarity: 'COMMON', img: "beyblade.png", type: 'ATTACK', power: 1.3, def: 0.8, stamina: 1.0 },
+  { id: 'p2', name: 'PHANTOM', color: '#12df34', price: 100, rarity: 'COMMON', img: "beyblade2.png", type: 'STAMINA', power: 0.8, def: 1.0, stamina: 1.4 },
+  { id: 'p3', name: 'DRAGON', color: '#ffffff', price: 1000, rarity: 'RARE', img: "beyblade3.png", type: 'ATTACK', power: 1.5, def: 0.7, stamina: 0.9 },
+  { id: 'p4', name: 'GALAXY', color: '#90cdd8', price: 150, rarity: 'RARE', img: "beyblade4.png", type: 'DEFENSE', power: 1.0, def: 1.5, stamina: 0.8 },
+  { id: 'p5', name: 'BLIZZARD', color: '#f10f0f', price: 750, rarity: 'RARE', img: "beyblade5.png", type: 'STAMINA', power: 0.9, def: 1.1, stamina: 1.3 },
+  { id: 'p6', name: 'NEMESIS', color: '#ffffff', price: 150, rarity: 'RARE', img: "beyblade6.png", type: 'DEFENSE', power: 1.1, def: 1.4, stamina: 0.9 },
+  { id: 'p7', name: 'BLITZ', color: '#ffbb00', price: 800, rarity: 'RARE', img: "beyblade7.png", type: 'ATTACK', power: 1.6, def: 0.6, stamina: 0.8 },
+  { id: 'p8', name: 'SOLAR', color: '#f1ed0f', price: 850, rarity: 'RARE', img: "beyblade8.png", type: 'STAMINA', power: 1.0, def: 1.0, stamina: 1.5 },
+  { id: 'p9', name: 'DARK HYDRA', color: '#000000', price: 900, rarity: 'RARE', img: "beyblade9.png", type: 'DEFENSE', power: 1.2, def: 1.6, stamina: 0.7 },
+  { id: 'p10', name: 'MAGMA', color: '#796b44', price: 670, rarity: 'RARE', img: "beyblade10.png", type: 'ATTACK', power: 1.4, def: 0.9, stamina: 1.1 },
+  { id: 'p11', name: 'QUETZAL', color: '#20d2ff', price: 200, rarity: 'RARE', img: "beyblade11.png", type: 'STAMINA', power: 0.8, def: 1.2, stamina: 1.4 },
+  { id: 'p12', name: 'VENOM', color: '#5406e6', price: 950, rarity: 'RARE', img: "beyblade12.png", type: 'ATTACK', power: 1.7, def: 0.5, stamina: 0.8 },
+  { id: 'p13', name: 'GOLD DRAGOON', color: '#ffd700', price: 9999, rarity: 'LEGENDARY', img: "beybladeGOLD.png", type: 'BALANCE', power: 1.5, def: 1.5, stamina: 1.5 },
 ];
+
 
 const arenas = {
   CLASSIC: { name: 'PRO STADIUM', bg: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)', color: '#00d4ff', drain: 0.9 },
@@ -50,8 +59,8 @@ const checkAchievements = (stats) => {
   const unlocked = [];
   if (stats.wins >= 1) unlocked.push('⚔️');
   if (stats.matches >= 10) unlocked.push('🔥');
-  if (stats.coins >= 100) unlocked.push('💰');
-  if (stats.wins >= 50) unlocked.push('👑');
+  if (stats.coins >= 1000) unlocked.push('💰');
+  if (stats.wins >= 100) unlocked.push('👑');
   return unlocked;
 };
 
@@ -69,6 +78,10 @@ const BeybladeChampionship = () => {
   const [sparks, setSparks] = useState([]);
   const [isKOFlash, setIsKOFlash] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [isSlowMo, setIsSlowMo] = useState(false);
+
+  const [p1Attacking, setP1Attacking] = useState(false);
+const [p2Attacking, setP2Attacking] = useState(false);
   
   const [gachaAnimating, setGachaAnimating] = useState(false);
   const [gachaResult, setGachaResult] = useState(null);
@@ -78,9 +91,8 @@ const BeybladeChampionship = () => {
   const roarRef = useRef(new Audio(ROAR_SFX_URL));
   const winnerProcessedRef = useRef(false);
 
-  // --- NOVOS REFS PARA PERFECT HIT ---
-  const keyAppearTimeRef = useRef(0); // Marca quando a letra apareceu
-  const [hitFeedback, setHitFeedback] = useState(null); // Estado para mostrar "PERFECT"
+  const keyAppearTimeRef = useRef(0);
+  const [hitFeedback, setHitFeedback] = useState(null);
 
   const [showBeastP1, setShowBeastP1] = useState(false);
   const [showBeastP2, setShowBeastP2] = useState(false);
@@ -100,8 +112,6 @@ const BeybladeChampionship = () => {
     battleTime: 0
   });
 
-  // CRONÔMETRO DE REFLEXO
-  // Toda vez que a letra muda, reinicia o cronômetro local
   useEffect(() => {
     keyAppearTimeRef.current = Date.now();
   }, [gameState.targetKey]);
@@ -208,7 +218,7 @@ const BeybladeChampionship = () => {
   const playClashSound = useCallback((isPerfect) => {
     const sound = sfxRef.current.cloneNode();
     sound.volume = 0.6;
-    if (isPerfect) sound.playbackRate = 1.5; // Som mais agudo no Perfect
+    if (isPerfect) sound.playbackRate = 1.5; 
     sound.play().catch(() => {});
   }, []);
 
@@ -217,15 +227,24 @@ const BeybladeChampionship = () => {
     return chars.charAt(Math.floor(Math.random() * chars.length));
   }, []);
 
-  const addSparks = useCallback((pos, isPerfect) => {
+  const addSparks = useCallback((pos, isPerfect, isUltimate = false) => {
     const isSD = gameState.battleTime >= 30;
-    const count = isPerfect ? 20 : (isSD ? 12 : 8); // Mais faíscas no perfect
+    // Se for Ultimate, gera MUITO mais faíscas (50 faíscas!)
+    const count = isUltimate ? 50 : (isPerfect ? 20 : (isSD ? 12 : 8)); 
+    
+    // Ajuste fino para o vão entre as beys
+    const centerX = 50 + (pos / 14); 
+
     const newSparks = Array.from({ length: count }).map(() => ({
-      id: Math.random(), x: 50 + (pos / 25), y: 50,
-      vx: (Math.random() - 0.5) * (isSD ? 8 : 4),
-      vy: (Math.random() - 0.5) * (isSD ? 8 : 4),
+      id: Math.random(), 
+      x: centerX, 
+      y: 50 + (Math.random() * 6 - 3),
+      // Faíscas do especial voam mais longe e mais rápido
+      vx: (Math.random() - 0.5) * (isUltimate ? 15 : (isSD ? 8 : 4)),
+      vy: (Math.random() - 0.5) * (isUltimate ? 15 : (isSD ? 8 : 4)),
       life: 1.0,
-      color: isPerfect ? '#ffd700' : '#f1c40f' // Faísca dourada no perfect
+      // Especial gera faíscas azuis e brancas para brilhar mais
+      color: isUltimate ? (Math.random() > 0.5 ? '#00d4ff' : '#fff') : (isPerfect ? '#ffd700' : '#f1c40f') 
     }));
     setSparks((prev) => [...prev, ...newSparks]);
   }, [gameState.battleTime]);
@@ -276,7 +295,16 @@ const BeybladeChampionship = () => {
     const inputKey = key.toUpperCase();
     if (inputKey === 'SPACE' || inputKey === 'ULTIMATE') {
        if (myRole === 'p1' && gameState.ultP1 >= 100) {
-          const updates = { ultP1: 0, rpmP1: Math.min(500, gameState.rpmP1 + 150), lastUltP1: Date.now() };
+
+          setIsSlowMo(true);
+          setTimeout(() => setIsSlowMo(false), 1500);
+
+          const updates = 
+          { ultP1: 0,
+             rpmP1: Math.min(500, gameState.rpmP1 + 180),
+              lastUltP1: Date.now() };
+
+          addSparks(gameState.clashPos, false, true);
           if (mode === 'ONLINE') update(ref(db, `rooms/${roomId}`), updates);
           else setGameState(prev => ({ ...prev, ...updates }));
           return;
@@ -291,28 +319,40 @@ const BeybladeChampionship = () => {
     
     setGameState(prev => {
       if (inputKey === prev.targetKey) {
-        // --- LÓGICA DO PERFECT HIT ---
         const reactionTime = Date.now() - keyAppearTimeRef.current;
-        const isPerfect = reactionTime < 400; // Janela de 400ms
-        
-        // Efeito Visual
+        const isPerfect = reactionTime < 400; 
+
+        // --- 1. ATIVAR ANIMAÇÃO DE BOTE (DASH) ---
+        if (myRole === 'p1') {
+            setP1Attacking(true);
+            setTimeout(() => setP1Attacking(false), 150);
+        } else {
+            setP2Attacking(true);
+            setTimeout(() => setP2Attacking(false), 150);
+        }
+
+        // --- 2. LOGICA DE FLASH DE IMPACTO ---
+        if (isPerfect) {
+            setIsKOFlash(true);
+            setTimeout(() => setIsKOFlash(false), 50);
+        }
+
         setHitFeedback({
            text: isPerfect ? "PERFECT!" : "GOOD",
            color: isPerfect ? "#ffd700" : "#fff",
            scale: isPerfect ? 1.5 : 1.0,
            id: Date.now()
         });
-        setTimeout(() => setHitFeedback(null), 500); // Some depois de meio segundo
+        setTimeout(() => setHitFeedback(null), 500); 
 
         addSparks(prev.clashPos, isPerfect);
         playClashSound(isPerfect);
         
-        // CÁLCULO DE PODER
         let basePower = prev.battleTime >= 30 ? 45 : 25;
-        let power = isPerfect ? basePower * 1.5 : basePower; // 50% mais dano no Perfect
-        
-        let baseCharge = 15;
-        let ultCharge = isPerfect ? 25 : 15; // Carrega ultimate mais rápido no Perfect
+        const attackFactor = selectedBey.power || 1.0; 
+        let power = (isPerfect ? basePower * 1.5 : basePower) * attackFactor;
+        let knockback = isPerfect ? (15 * attackFactor) : 0; 
+        let ultCharge = isPerfect ? 25 : 15; 
 
         const nextKey = generateLetter();
 
@@ -321,27 +361,23 @@ const BeybladeChampionship = () => {
           if (myRole === 'p1') {
             updates['rpmP1'] = Math.min(400, prev.rpmP1 + power);
             updates['ultP1'] = Math.min(100, prev.ultP1 + ultCharge);
+            updates['clashPos'] = prev.clashPos + knockback; 
           } else {
             updates['rpmP2'] = Math.min(400, prev.rpmP2 + power);
             updates['ultP2'] = Math.min(100, prev.ultP2 + ultCharge);
+            updates['clashPos'] = prev.clashPos - knockback; 
           }
           updates['targetKey'] = nextKey;
           update(ref(db, `rooms/${roomId}`), updates);
-          
-          return {
-             ...prev, 
-             [myRole === 'p1' ? 'rpmP1' : 'rpmP2']: Math.min(400, (myRole === 'p1' ? prev.rpmP1 : prev.rpmP2) + power),
-             [myRole === 'p1' ? 'ultP1' : 'ultP2']: Math.min(100, (myRole === 'p1' ? prev.ultP1 : prev.ultP2) + ultCharge),
-             targetKey: nextKey
-          };
-        } else {
-          return { 
-             ...prev, 
-             rpmP1: Math.min(400, prev.rpmP1 + power), 
-             ultP1: Math.min(100, prev.ultP1 + ultCharge),
-             targetKey: nextKey 
-          };
         }
+        
+        return {
+           ...prev, 
+           [myRole === 'p1' ? 'rpmP1' : 'rpmP2']: Math.min(400, (myRole === 'p1' ? prev.rpmP1 : prev.rpmP2) + power),
+           [myRole === 'p1' ? 'ultP1' : 'ultP2']: Math.min(100, (myRole === 'p1' ? prev.ultP1 : prev.ultP2) + ultCharge),
+           clashPos: myRole === 'p1' ? prev.clashPos + knockback : prev.clashPos - knockback,
+           targetKey: nextKey
+        };
       }
       return prev;
     });
@@ -364,21 +400,39 @@ const BeybladeChampionship = () => {
     
     const interval = setInterval(() => {
       setGameState(prev => {
+
+        
+
         const isSD = prev.battleTime >= 30;
         const drain = arenas[arenaType].drain * (isSD ? 2.2 : 1.0);
         let cpuBoost = (mode === 'CPU' && Math.random() > (isSD ? 0.90 : 0.94)) ? (isSD ? 35 : 20) : 0;
         
-        const newRpmP1 = Math.max(0, prev.rpmP1 - 0.75 * drain);
+        const staminaFactor = selectedBey.stamina || 1.0;
+        const newRpmP1 = Math.max(0, prev.rpmP1 - (0.75 * drain / staminaFactor));
+      
         const rpmP2ForPhysics = mode === 'ONLINE' ? prev.rpmP2 : Math.max(0, prev.rpmP2 + cpuBoost - 0.75 * drain);
 
         const diff = newRpmP1 - rpmP2ForPhysics;
         let newPos = prev.clashPos + (diff * (isSD ? 0.28 : 0.15));
         let newWinner = null;
+        
 
+        // --- CHECAGEM DE VITÓRIA (OPÇÃO 3 INTEGRADA) ---
         if (newPos > 700 || newPos < -700) {
-          setIsKOFlash(true); setTimeout(() => setIsKOFlash(false), 200);
+          // Vitória por KO (Sair da arena)
+          setIsKOFlash(true); 
+          setTimeout(() => setIsKOFlash(false), 200);
           newWinner = newPos > 700 ? prev.nameP1 : prev.nameP2;
+        } 
+        else if (newRpmP1 <= 0) {
+          // Vitória por Sleep Out (P1 parou de girar)
+          newWinner = prev.nameP2; 
+        } 
+        else if (rpmP2ForPhysics <= 0) {
+          // Vitória por Sleep Out (P2 parou de girar)
+          newWinner = prev.nameP1;
         }
+        // ----------------------------------------------
 
         if (mode === 'ONLINE') {
             update(ref(db, `rooms/${roomId}`), {
@@ -403,20 +457,62 @@ const BeybladeChampionship = () => {
   }, [mode, myRole, phase, gameState.status, gameState.winner, roomId, arenaType]);
 
   useEffect(() => {
-    if (mode !== 'ONLINE' || myRole !== 'p2') return;
+    if (mode === 'ONLINE' && myRole !== 'p1') return;
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
-
+    
     const interval = setInterval(() => {
-        setGameState(prev => {
-            const isSD = prev.battleTime >= 30;
-            const drain = arenas[arenaType].drain * (isSD ? 2.2 : 1.0);
-            const newRpmP2 = Math.max(0, prev.rpmP2 - 0.75 * drain);
-            update(ref(db, `rooms/${roomId}`), { rpmP2: newRpmP2 });
-            return { ...prev, rpmP2: newRpmP2 };
-        });
+      setGameState(prev => {
+
+        if (prev.winner) return prev;
+
+        const speedFactor = isSlowMo ? 0.25 : 1.0; 
+        const isSD = prev.battleTime >= 30;
+        const staminaFactor = selectedBey.stamina || 1.0;
+        const drain = (arenas[arenaType].drain * (isSD ? 2.2 : 1.0)) * speedFactor;
+        
+        // Redução de RPM
+        const newRpmP1 = Math.max(0, prev.rpmP1 - (0.75 * drain / staminaFactor));
+        let cpuBoost = (mode === 'CPU' && Math.random() > (isSD ? 0.90 : 0.94)) ? (isSD ? 35 : 20) : 0;
+        const rpmP2ForPhysics = mode === 'ONLINE' ? prev.rpmP2 : Math.max(0, prev.rpmP2 + cpuBoost - 0.75 * drain);
+
+        const diff = newRpmP1 - rpmP2ForPhysics;
+        let newPos = prev.clashPos + (diff * (isSD ? 0.28 : 0.15) * speedFactor);
+        
+        let newWinner = null;
+        // PRIORIDADE 1: Saída da Arena
+        if (newPos > 700 || newPos < -700) {
+          setIsKOFlash(true); setTimeout(() => setIsKOFlash(false), 200);
+          newWinner = newPos > 700 ? prev.nameP1 : prev.nameP2;
+        } 
+        // PRIORIDADE 2: RPM Zerado (Só checa se ninguém saiu da arena ainda)
+        else if (newRpmP1 <= 0 && rpmP2ForPhysics > 0) {
+          newWinner = mode === 'CPU' ? 'CPU' : prev.nameP2;
+        } 
+        else if (rpmP2ForPhysics <= 0 && newRpmP1 > 0) {
+          newWinner = prev.nameP1;
+        }
+
+        if (mode === 'ONLINE') {
+            update(ref(db, `rooms/${roomId}`), {
+                battleTime: prev.battleTime + (0.1 * speedFactor), // O cronômetro também fica lento
+                clashPos: newPos,
+                rpmP1: newRpmP1,
+                winner: newWinner
+            });
+        }
+
+        return {
+          ...prev,
+          battleTime: prev.battleTime + (0.1 * speedFactor),
+          clashPos: newPos,
+          rpmP1: newRpmP1,
+          rpmP2: rpmP2ForPhysics,
+          winner: newWinner // O React vai ler isso e parar o jogo no próximo ciclo
+        };
+      });
     }, 100);
     return () => clearInterval(interval);
-  }, [mode, myRole, phase, gameState.status, gameState.winner, roomId, arenaType]);
+  }, [mode, myRole, phase, gameState.status, gameState.winner, roomId, arenaType, isSlowMo, selectedBey]);
 
   const getShakeClass = () => {
     if (gameState.winner) return ''; 
@@ -445,13 +541,48 @@ const BeybladeChampionship = () => {
   );
 
   return (
-    <div className={`game-root ${getShakeClass()}`}>
+    <div className={`game-root ${getShakeClass()} ${isSlowMo ? 'slow-mo' : ''}`}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        .game-root { position: fixed; inset: 0; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
+        .game-root { position: fixed; inset: 0; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: none; transition: background 0.5s; }
+        
+        /* Efeito de Slow Motion muito mais visível */
+    .slow-mo { 
+    filter: invert(1) hue-rotate(180deg) contrast(1.5); /* Inverte as cores como um raio-x */
+    transition: filter 0.2s;
+    background: #fff !important; 
+}
+
+        /* ANIMAÇÃO DE BAMBEAR (WOBBLE) */
+        @keyframes wobble {
+          0% { transform: rotate(0deg) translateY(0px) skew(0deg); }
+          25% { transform: rotate(3deg) translateY(1px) skew(2deg); }
+          75% { transform: rotate(-3deg) translateY(-1px) skew(-2deg); }
+          100% { transform: rotate(0deg) translateY(0px) skew(0deg); }
+        }
+        .low-energy { animation: wobble 0.3s infinite linear !important; }
+
+        /* ANIMAÇÃO DE FUMAÇA */
+        @keyframes smokeUp {
+          0% { transform: translateY(0) scale(1); opacity: 0.8; }
+          100% { transform: translateY(-50px) scale(2); opacity: 0; }
+        }
+        .smoke-particle {
+          position: absolute; width: 15px; height: 15px; background: rgba(80,80,80,0.6);
+          border-radius: 50%; filter: blur(5px); pointer-events: none;
+          animation: smokeUp 1s infinite;
+          z-index: 6;
+        }
+
+        /* CORREÇÃO DO EFEITO DE MORTE SÚBITA */
         .shake-soft { animation: shakeEffect 0.12s infinite; }
-        .shake-hard { animation: shakeEffect 0.08s infinite; background: #2a0000 !important; }
-        .shake-sd { animation: shakeEffect 0.1s infinite; background: #1a0000 !important; }
+        .shake-hard { animation: shakeEffect 0.08s infinite; }
+        
+        .shake-sd { 
+           animation: shakeEffect 0.1s infinite; 
+           box-shadow: inset 0 0 100px rgba(255, 0, 0, 0.4); 
+        }
+
         @keyframes shakeEffect { 0% { transform: translate(1px, 1px); } 50% { transform: translate(-2px, -1px); } 100% { transform: translate(1px, 1px); } }
         .ko-flash { position: fixed; inset: 0; background: #fff; z-index: 999; pointer-events: none; animation: flashAnim 0.2s forwards; }
         @keyframes flashAnim { from { opacity: 1; } to { opacity: 0; } }
@@ -470,13 +601,14 @@ const BeybladeChampionship = () => {
         @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
         @keyframes zoomBeast { 0% { transform: scale(0.5); opacity: 0; } 20% { transform: scale(1.2); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
 
-        .stadium { width: 95vw; height: 40vh; border-top: 6px solid #333; border-bottom: 6px solid #333; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #222 0%, #000 100%); }
+        .stadium { width: 95vw; height: 40vh; border-top: 6px solid #333; border-bottom: 6px solid #333; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #222 0%, #000 100%); transition: all 0.3s; }
+        .stadium.active-sd { border-color: #ff0000 !important; box-shadow: 0 0 30px #ff0000; } 
+
         .bey { width: 70px; height: 70px; position: absolute; z-index: 5; transition: left 0.1s linear, right 0.1s linear; display: flex; align-items: center; justify-content: center; } 
         .bey img { width: 100%; height: 100%; object-fit: contain; }
         .bey-fallback { width: 100%; height: 100%; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 15px currentColor; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; background: #000; }
         .qte-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border: 4px solid #f1c40f; font-size: 30px; z-index: 100; box-shadow: 0 0 20px #f1c40f; border-radius: 10px; }
         
-        /* FEEDBACK DE HIT (PERFECT / GOOD) */
         .hit-feedback {
            position: absolute; top: 30%; left: 50%; transform: translateX(-50%);
            font-size: 20px; font-weight: bold; text-shadow: 2px 2px 0 #000;
@@ -498,10 +630,6 @@ const BeybladeChampionship = () => {
 
         .leaderboard-container { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; padding: 10px; width: 150px; z-index: 50; max-height: 80vh; overflow-y: auto; }
 
-        .rotate-warning { display: none; position: fixed; inset: 0; background: #000; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #f1c40f; }
-        .rotate-icon { font-size: 50px; animation: spinIcon 2s infinite ease-in-out; margin-bottom: 20px; }
-        @keyframes spinIcon { 0% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } 100% { transform: rotate(0deg); } }
-        
         @media (orientation: portrait) { .rotate-warning { display: flex; } }
 
         .mobile-controls { position: absolute; bottom: 10px; width: 100%; display: none; justify-content: space-between; align-items: flex-end; padding: 0 40px; box-sizing: border-box; z-index: 500; pointer-events: none; }
@@ -523,16 +651,9 @@ const BeybladeChampionship = () => {
            .game-root { display: flex; flex-direction: column; overflow-y: auto; justify-content: flex-start; padding-top: 20px; }
         }
       `}</style>
-      
-      <div className="rotate-warning">
-         <div className="rotate-icon">📱 ➡️ 📟</div>
-         <p>PLEASE ROTATE YOUR DEVICE</p>
-         <p style={{fontSize:'10px', marginTop:'10px'}}>LANDSCAPE MODE REQUIRED</p>
-      </div>
 
       {isKOFlash && <div className="ko-flash" />}
 
-      {/* VISUALIZAÇÃO DE PERFECT HIT */}
       {hitFeedback && (
           <div className="hit-feedback" style={{color: hitFeedback.color, transform: `translateX(-50%) scale(${hitFeedback.scale})`}}>
               {hitFeedback.text}
@@ -560,6 +681,18 @@ const BeybladeChampionship = () => {
             <div className="bar-outer"><div className="bar-fill" style={{ width: `${(gameState.rpmP1/300)*100}%`, background: selectedBey.color }} /></div>
             <div className={`ult-bar ${gameState.ultP1 >= 100 ? 'ult-ready' : ''}`}>
                <div className="ult-fill" style={{width: `${gameState.ultP1}%`}} />
+               {/* MENSAGEM DE AVISO */}
+{gameState.ultP1 >= 100 && (
+  <div style={{
+    fontSize: '7px', 
+    color: '#ffd700', 
+    marginTop: '5px', 
+    animation: 'pulseUlt 0.4s infinite alternate',
+    textShadow: '1px 1px #000'
+  }}>
+    PRESS SPACE!
+  </div>
+)}
             </div>
           </div>
           <div className="timer" style={{ borderColor: gameState.battleTime >= 30 ? '#ff0000' : '#fff', color: gameState.battleTime >= 30 ? '#ff0000' : '#fff' }}>
@@ -580,15 +713,11 @@ const BeybladeChampionship = () => {
                ULT
            </div>
            <div className="mobile-grid">
-               {['A','B','C','D','E','F','G','H','I'].map((_, i) => {
-                   const keys = ['L','U','R','X','A','B','Y','D','N'];
-                   const k = keys[i];
-                   return (
-                      <div key={k} className="mob-btn" onTouchStart={(e) => { e.preventDefault(); triggerGameAction(k); }}>
-                          {k}
-                      </div>
-                   )
-               })}
+               {['L','U','R','X','A','B','Y','D','N'].map((k) => (
+                  <div key={k} className="mob-btn" onTouchStart={(e) => { e.preventDefault(); triggerGameAction(k); }}>
+                      {k}
+                  </div>
+               ))}
            </div>
         </div>
         </>
@@ -599,21 +728,76 @@ const BeybladeChampionship = () => {
           {gameState.battleTime >= 30 && !gameState.winner && <div style={{position: 'absolute', top: '10px', color: 'red', zIndex:20}}>SUDDEN DEATH!</div>}
           {!gameState.winner && <div className="qte-center">{gameState.targetKey}</div>}
           
-          <div className="bey" style={{ left: `calc(50% - ${mode === 'ONLINE' || window.innerWidth < 900 ? '50px' : '70px'} + ${gameState.clashPos}px)`, color: selectedBey.color }}>
-            <img src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} width="100%" alt="P1" style={{ transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)`, filter: selectedBey.rarity === 'LEGENDARY' ? 'sepia(100%) hue-rotate(5deg) saturate(300%)' : 'none' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
-            <div className="bey-fallback" style={{display: 'none', borderColor: selectedBey.color, transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)`}}>P1</div>
-            {gameState.battleTime >= 30 && <Lightning bolColor="#00d4ff" />}
-          </div>
+          {/* BEY PLAYER 1 */}
+<div className={`bey ${gameState.rpmP1 < 80 ? 'low-energy' : ''}`} 
+     style={{ 
+       left: `calc(50% - ${mode === 'ONLINE' || window.innerWidth < 900 ? '80px' : '100px'} + ${gameState.clashPos}px)`, 
+       color: selectedBey.color,
+       /* EFEITO DE BOTE: Avança 30px para a direita quando p1Attacking é true */
+       transform: `translateX(${p1Attacking ? '30px' : '0px'})`,
+       transition: 'transform 0.1s ease-out',
+       zIndex: p1Attacking ? 10 : 5
+     }}>
+  
+  {/* Fumaça (Mantida) */}
+  {gameState.rpmP1 < 60 && <div className="smoke-particle" style={{top: '-10px', left: '20px'}} />}
+  {gameState.rpmP1 < 60 && <div className="smoke-particle" style={{top: '-10px', left: '40px', animationDelay: '0.3s'}} />}
+  
+  <img 
+    src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} 
+    width="100%" 
+    alt="P1" 
+    style={{ 
+      transform: `rotate(${Date.now() * (gameState.rpmP1 / 15)}deg)`, 
+      filter: selectedBey.rarity === 'LEGENDARY' ? 'sepia(100%) hue-rotate(5deg) saturate(300%)' : 'none' 
+    }} 
+  />
+</div>
+
+{/* BEY PLAYER 2 */}
+<div className={`bey ${gameState.rpmP2 < 80 ? 'low-energy' : ''}`} 
+     style={{ 
+       right: `calc(50% - ${mode === 'ONLINE' || window.innerWidth < 900 ? '80px' : '100px'} - ${gameState.clashPos}px)`, 
+       color: '#ff4b2b',
+       /* EFEITO DE BOTE: Avança 30px para a esquerda quando p2Attacking é true */
+       transform: `translateX(${p2Attacking ? '-30px' : '0px'})`,
+       transition: 'transform 0.1s ease-out',
+       zIndex: p2Attacking ? 10 : 5
+     }}>
+  
+  {/* Fumaça (Mantida) */}
+  {gameState.rpmP2 < 60 && <div className="smoke-particle" style={{top: '-10px', right: '20px'}} />}
+  {gameState.rpmP2 < 60 && <div className="smoke-particle" style={{top: '-10px', right: '40px', animationDelay: '0.3s'}} />}
+  
+  <img 
+    src={gameState.skinP2} 
+    width="100%" 
+    alt="P2" 
+    style={{ 
+      transform: `rotate(-${Date.now() * (gameState.rpmP2 / 15)}deg)` 
+    }} 
+  />
+</div>
           
-          <div className="bey" style={{ right: `calc(50% - ${mode === 'ONLINE' || window.innerWidth < 900 ? '50px' : '70px'} - ${gameState.clashPos}px)`, color: '#ff4b2b' }}>
-            <img src={gameState.skinP2} width="100%" alt="P2" style={{ transform: `rotate(-${Date.now() * (gameState.rpmP2/10)}deg)` }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
-            <div className="bey-fallback" style={{display: 'none', borderColor: '#ff4b2b', transform: `rotate(-${Date.now() * (gameState.rpmP2/10)}deg)`}}>P2</div>
-            {gameState.battleTime >= 30 && <Lightning bolColor="#ff4b2b" />}
-          </div>
-          
-          {sparks.map((s) => (
-            <div key={s.id} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: '6px', height: '6px', background: `${s.color}`, opacity: s.life, boxShadow: '2px 2px 0 #000' }} />
-          ))}
+        {sparks.map((s) => (
+  <div 
+    key={s.id} 
+    style={{ 
+      position: 'absolute', 
+      left: `${s.x}%`, 
+      top: `${s.y}%`, 
+      width: s.vx > 10 ? '8px' : '4px', // Partículas do especial são maiores
+      height: s.vx > 10 ? '8px' : '4px', 
+      background: s.color, 
+      opacity: s.life, 
+      boxShadow: `0 0 15px ${s.color}, 0 0 5px #fff`, // Brilho duplo
+      borderRadius: '50%',
+      pointerEvents: 'none',
+      transform: 'translate(-50%, -50%)',
+      transition: 'opacity 0.1s'
+    }} 
+  />
+))}
         </div>
       )}
 
@@ -728,7 +912,16 @@ const BeybladeChampionship = () => {
             {BEY_SHOP.map(b => (
               <div key={b.id} style={{border: `1px solid ${b.rarity === 'LEGENDARY' ? '#ffd700' : '#444'}`, padding: '10px', opacity: inventory.includes(b.id) ? 1 : 0.6}}>
                 <img src={b.img} width="40" alt={b.name} style={{filter: b.rarity === 'LEGENDARY' ? 'sepia(100%) hue-rotate(5deg) saturate(300%)' : 'none'}} onError={(e) => e.target.style.opacity = '0.3'} />
-                <p style={{fontSize: '8px', color: b.color}}>{b.name}</p>
+                <p style={{fontSize: '8px', color: b.color, marginBottom: '2px'}}>{b.name}</p>
+
+              <p style={{
+               fontSize: '6px', 
+              color: b.type === 'ATTACK' ? '#ff4b2b' : b.type === 'DEFENSE' ? '#00d4ff' : '#12df34', 
+              margin: '2px 0',
+              fontWeight: 'bold'
+              }}>
+              TYPE: {b.type}
+              </p>
                 {inventory.includes(b.id) ? 
                   <button className="btn" onClick={() => { setSelectedBey(b); setGameState(s => ({...s, skinP1: b.img})); setPhase('TITLE'); }}>SELECT</button> :
                   <p style={{fontSize: '8px', marginTop: '5px'}}>{b.price > 1000 ? "GACHA ONLY" : `${b.price}💰`}</p>
