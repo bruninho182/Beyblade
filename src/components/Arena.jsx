@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set, update, get, query, orderByChild, limitToLast } from "firebase/database";
 
-// --- 1. CONFIGURAÇÃO (MANTIDA) ---
+// --- 1. CONFIGURAÇÃO ---
 const firebaseConfig = {
   apiKey: "AIzaSyABAyy8d3qmzJ1gR0M9ykwUstyT2K71Kns",
   authDomain: "beybladeonline.firebaseapp.com",
@@ -78,6 +78,10 @@ const BeybladeChampionship = () => {
   const roarRef = useRef(new Audio(ROAR_SFX_URL));
   const winnerProcessedRef = useRef(false);
 
+  // --- NOVOS REFS PARA PERFECT HIT ---
+  const keyAppearTimeRef = useRef(0); // Marca quando a letra apareceu
+  const [hitFeedback, setHitFeedback] = useState(null); // Estado para mostrar "PERFECT"
+
   const [showBeastP1, setShowBeastP1] = useState(false);
   const [showBeastP2, setShowBeastP2] = useState(false);
 
@@ -96,9 +100,11 @@ const BeybladeChampionship = () => {
     battleTime: 0
   });
 
-  const triggerHaptic = (duration = 50) => {
-    if (navigator.vibrate) navigator.vibrate(duration);
-  };
+  // CRONÔMETRO DE REFLEXO
+  // Toda vez que a letra muda, reinicia o cronômetro local
+  useEffect(() => {
+    keyAppearTimeRef.current = Date.now();
+  }, [gameState.targetKey]);
 
   const rollGacha = () => {
     if (stats.coins < 100) return alert("MOEDAS INSUFICIENTES (100💰)");
@@ -199,9 +205,10 @@ const BeybladeChampionship = () => {
     }
   }, [phase, gameState.status, gameState.winner]);
 
-  const playClashSound = useCallback(() => {
+  const playClashSound = useCallback((isPerfect) => {
     const sound = sfxRef.current.cloneNode();
     sound.volume = 0.6;
+    if (isPerfect) sound.playbackRate = 1.5; // Som mais agudo no Perfect
     sound.play().catch(() => {});
   }, []);
 
@@ -210,13 +217,15 @@ const BeybladeChampionship = () => {
     return chars.charAt(Math.floor(Math.random() * chars.length));
   }, []);
 
-  const addSparks = useCallback((pos) => {
+  const addSparks = useCallback((pos, isPerfect) => {
     const isSD = gameState.battleTime >= 30;
-    const newSparks = Array.from({ length: isSD ? 12 : 8 }).map(() => ({
+    const count = isPerfect ? 20 : (isSD ? 12 : 8); // Mais faíscas no perfect
+    const newSparks = Array.from({ length: count }).map(() => ({
       id: Math.random(), x: 50 + (pos / 25), y: 50,
       vx: (Math.random() - 0.5) * (isSD ? 8 : 4),
       vy: (Math.random() - 0.5) * (isSD ? 8 : 4),
       life: 1.0,
+      color: isPerfect ? '#ffd700' : '#f1c40f' // Faísca dourada no perfect
     }));
     setSparks((prev) => [...prev, ...newSparks]);
   }, [gameState.battleTime]);
@@ -267,14 +276,12 @@ const BeybladeChampionship = () => {
     const inputKey = key.toUpperCase();
     if (inputKey === 'SPACE' || inputKey === 'ULTIMATE') {
        if (myRole === 'p1' && gameState.ultP1 >= 100) {
-          triggerHaptic(200);
           const updates = { ultP1: 0, rpmP1: Math.min(500, gameState.rpmP1 + 150), lastUltP1: Date.now() };
           if (mode === 'ONLINE') update(ref(db, `rooms/${roomId}`), updates);
           else setGameState(prev => ({ ...prev, ...updates }));
           return;
        }
        if (myRole === 'p2' && gameState.ultP2 >= 100 && mode === 'ONLINE') {
-          triggerHaptic(200);
           const updates = { ultP2: 0, rpmP2: Math.min(500, gameState.rpmP2 + 150), lastUltP2: Date.now() };
           update(ref(db, `rooms/${roomId}`), updates);
           return;
@@ -284,12 +291,30 @@ const BeybladeChampionship = () => {
     
     setGameState(prev => {
       if (inputKey === prev.targetKey) {
-        triggerHaptic(50); 
-        addSparks(prev.clashPos);
-        playClashSound();
-        const power = prev.battleTime >= 30 ? 45 : 25;
+        // --- LÓGICA DO PERFECT HIT ---
+        const reactionTime = Date.now() - keyAppearTimeRef.current;
+        const isPerfect = reactionTime < 400; // Janela de 400ms
+        
+        // Efeito Visual
+        setHitFeedback({
+           text: isPerfect ? "PERFECT!" : "GOOD",
+           color: isPerfect ? "#ffd700" : "#fff",
+           scale: isPerfect ? 1.5 : 1.0,
+           id: Date.now()
+        });
+        setTimeout(() => setHitFeedback(null), 500); // Some depois de meio segundo
+
+        addSparks(prev.clashPos, isPerfect);
+        playClashSound(isPerfect);
+        
+        // CÁLCULO DE PODER
+        let basePower = prev.battleTime >= 30 ? 45 : 25;
+        let power = isPerfect ? basePower * 1.5 : basePower; // 50% mais dano no Perfect
+        
+        let baseCharge = 15;
+        let ultCharge = isPerfect ? 25 : 15; // Carrega ultimate mais rápido no Perfect
+
         const nextKey = generateLetter();
-        const ultCharge = 15;
 
         if (mode === 'ONLINE') {
           const updates = {};
@@ -445,13 +470,21 @@ const BeybladeChampionship = () => {
         @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
         @keyframes zoomBeast { 0% { transform: scale(0.5); opacity: 0; } 20% { transform: scale(1.2); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
 
-        /* --- TAMANHOS AJUSTADOS (V28) --- */
         .stadium { width: 95vw; height: 40vh; border-top: 6px solid #333; border-bottom: 6px solid #333; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #222 0%, #000 100%); }
-        .bey { width: 70px; height: 70px; position: absolute; z-index: 5; transition: left 0.1s linear, right 0.1s linear; display: flex; align-items: center; justify-content: center; } /* Reduzido de 80 para 70 */
+        .bey { width: 70px; height: 70px; position: absolute; z-index: 5; transition: left 0.1s linear, right 0.1s linear; display: flex; align-items: center; justify-content: center; } 
         .bey img { width: 100%; height: 100%; object-fit: contain; }
         .bey-fallback { width: 100%; height: 100%; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 15px currentColor; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; background: #000; }
         .qte-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border: 4px solid #f1c40f; font-size: 30px; z-index: 100; box-shadow: 0 0 20px #f1c40f; border-radius: 10px; }
         
+        /* FEEDBACK DE HIT (PERFECT / GOOD) */
+        .hit-feedback {
+           position: absolute; top: 30%; left: 50%; transform: translateX(-50%);
+           font-size: 20px; font-weight: bold; text-shadow: 2px 2px 0 #000;
+           z-index: 150; pointer-events: none;
+           animation: floatUp 0.5s forwards;
+        }
+        @keyframes floatUp { 0% { opacity: 1; transform: translate(-50%, 0) scale(0.5); } 50% { transform: translate(-50%, -20px) scale(1.2); } 100% { opacity: 0; transform: translate(-50%, -40px) scale(1.0); } }
+
         .panel { border: 4px solid #fff; padding: 20px; background: #111; text-align: center; box-shadow: 6px 6px 0 #c0392b; max-width: 90vw; }
         .btn { padding: 10px 20px; margin: 5px; background: #000; border: 3px solid #fff; color: #fff; cursor: pointer; font-family: 'Press Start 2P'; font-size: 10px; }
         .rank-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 8px; margin-top: 5px; color: #000; font-weight: bold; }
@@ -463,62 +496,34 @@ const BeybladeChampionship = () => {
         .rarity-RARE { color: #2ecc71; }
         .rarity-COMMON { color: #fff; }
 
-        /* LEADERBOARD DESKTOP */
         .leaderboard-container { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; padding: 10px; width: 150px; z-index: 50; max-height: 80vh; overflow-y: auto; }
 
-        /* AVISO DE ROTAÇÃO */
         .rotate-warning { display: none; position: fixed; inset: 0; background: #000; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #f1c40f; }
         .rotate-icon { font-size: 50px; animation: spinIcon 2s infinite ease-in-out; margin-bottom: 20px; }
         @keyframes spinIcon { 0% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } 100% { transform: rotate(0deg); } }
         
-        @media (orientation: portrait) {
-            .rotate-warning { display: flex; }
-        }
+        @media (orientation: portrait) { .rotate-warning { display: flex; } }
 
-        /* CONTROLES MOBILE */
-        .mobile-controls {
-           position: absolute; bottom: 10px; width: 100%; display: none; justify-content: space-between; align-items: flex-end; padding: 0 40px; box-sizing: border-box; z-index: 500; pointer-events: none; 
-        }
-        
-        .mobile-grid {
-           display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; pointer-events: auto;
-        }
-        .mob-btn {
-           width: 50px; height: 50px; background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255,255,255,0.5);
-           border-radius: 8px; color: #fff; font-family: 'Press Start 2P'; font-size: 14px;
-           display: flex; align-items: center; justify-content: center; user-select: none;
-        }
+        .mobile-controls { position: absolute; bottom: 10px; width: 100%; display: none; justify-content: space-between; align-items: flex-end; padding: 0 40px; box-sizing: border-box; z-index: 500; pointer-events: none; }
+        .mobile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; pointer-events: auto; }
+        .mob-btn { width: 50px; height: 50px; background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255,255,255,0.5); border-radius: 8px; color: #fff; font-family: 'Press Start 2P'; font-size: 14px; display: flex; align-items: center; justify-content: center; user-select: none; }
         .mob-btn:active { background: #fff; color: #000; }
-        
-        .ult-btn-mobile {
-            width: 80px; height: 80px; background: radial-gradient(circle, #ffd700, #ffaa00); border: 4px solid #fff;
-            color: #000; font-family: 'Press Start 2P'; font-size: 10px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center; border-radius: 50%; user-select: none;
-            box-shadow: 0 0 20px #ffd700; pointer-events: auto; text-align: center;
-        }
+        .ult-btn-mobile { width: 80px; height: 80px; background: radial-gradient(circle, #ffd700, #ffaa00); border: 4px solid #fff; color: #000; font-family: 'Press Start 2P'; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 50%; user-select: none; box-shadow: 0 0 20px #ffd700; pointer-events: auto; text-align: center; }
         .ult-btn-mobile:active { transform: scale(0.9); }
         .ult-btn-mobile.disabled { filter: grayscale(1); opacity: 0.5; }
 
-        /* AJUSTES PARA MOBILE (LANDSCAPE) */
         @media (orientation: landscape) and (max-width: 900px) {
            .mobile-controls { display: flex; }
-           .stadium { width: 100vw; height: 50vh; border: none; } /* Arena ocupa 50% da altura para deixar espaço */
-           .bey { width: 50px; height: 50px; } /* Beyblades menores no celular */
-           
+           .stadium { width: 100vw; height: 50vh; border: none; } 
+           .bey { width: 50px; height: 50px; }
            .hud-battle { top: 5px; width: 60%; left: 20%; } 
            .bar-outer { width: 100px; height: 8px; } 
            .panel { transform: scale(0.85); margin-top: 10px; } 
-           
-           /* FIX DO RANKING NO MOBILE: VIRA RELATIVO */
-           .leaderboard-container {
-              position: static; transform: none; width: 90%; margin: 10px auto; order: 10; max-height: 120px;
-           }
-           /* Força a tela de título a usar flex-col para o rank ir pra baixo */
+           .leaderboard-container { position: static; transform: none; width: 90%; margin: 10px auto; order: 10; max-height: 120px; }
            .game-root { display: flex; flex-direction: column; overflow-y: auto; justify-content: flex-start; padding-top: 20px; }
         }
       `}</style>
       
-      {/* TELA DE BLOQUEIO DE ROTAÇÃO */}
       <div className="rotate-warning">
          <div className="rotate-icon">📱 ➡️ 📟</div>
          <p>PLEASE ROTATE YOUR DEVICE</p>
@@ -526,6 +531,13 @@ const BeybladeChampionship = () => {
       </div>
 
       {isKOFlash && <div className="ko-flash" />}
+
+      {/* VISUALIZAÇÃO DE PERFECT HIT */}
+      {hitFeedback && (
+          <div className="hit-feedback" style={{color: hitFeedback.color, transform: `translateX(-50%) scale(${hitFeedback.scale})`}}>
+              {hitFeedback.text}
+          </div>
+      )}
 
       {showBeastP1 && (
          <div className="beast-cutin" style={{justifyContent: 'flex-start', paddingLeft: '50px'}}>
@@ -600,7 +612,7 @@ const BeybladeChampionship = () => {
           </div>
           
           {sparks.map((s) => (
-            <div key={s.id} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: '6px', height: '6px', background: '#f1c40f', opacity: s.life, boxShadow: '2px 2px 0 #000' }} />
+            <div key={s.id} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: '6px', height: '6px', background: `${s.color}`, opacity: s.life, boxShadow: '2px 2px 0 #000' }} />
           ))}
         </div>
       )}
@@ -638,17 +650,12 @@ const BeybladeChampionship = () => {
           <button className="btn" onClick={() => { bgmRef.current.play().catch(() => {}); userName ? setPhase('MODE_SELECT') : alert("ENTER NAME"); }}>START</button>
           <button className="btn" onClick={() => setPhase('SHOP')}>SHOP</button>
           <button className="btn" onClick={() => setPhase('TASKS')}>TASKS</button>
-          
-          {/* RANKING (VAI FICAR EMBAIXO NO MOBILE GRAÇAS AO CSS) */}
           <LeaderboardWidget />
         </div>
       )}
 
       {phase !== 'BATTLE' && phase !== 'TITLE' && <LeaderboardWidget />}
 
-      {/* OUTRAS TELAS MANTIDAS (TASKS, MODE_SELECT, LOBBY, SHOP, ARENA, WINNER) */}
-      {/* ... (O restante do código de renderização das telas permanece igual ao da V27) ... */}
-      
       {phase === 'TASKS' && (
         <div className="panel">
           <h2>DAILY TASKS</h2>
