@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set, update, get } from "firebase/database";
 
-// --- CONFIGURAÇÃO BLINDADA ---
+// --- CONFIGURAÇÃO ( MANTIDA ) ---
 const firebaseConfig = {
   apiKey: "AIzaSyABAyy8d3qmzJ1gR0M9ykwUstyT2K71Kns",
   authDomain: "beybladeonline.firebaseapp.com",
@@ -44,12 +44,11 @@ const BeybladeChampionship = () => {
   const [sparks, setSparks] = useState([]);
   const [isKOFlash, setIsKOFlash] = useState(false);
   
-  // ESTADO CORRIGIDO: CHAVES SEPARADAS PARA P1 E P2
   const [gameState, setGameState] = useState({
     rpmP1: 50, rpmP2: 50,
     clashPos: 0, 
-    targetKeyP1: 'A', // Tecla exclusiva do Host
-    targetKeyP2: 'B', // Tecla exclusiva do Join
+    targetKeyP1: 'A', 
+    targetKeyP2: 'B',
     status: 'LOBBY', winner: null,
     skinP1: BEY_SHOP[0].img, skinP2: BEY_SHOP[0].img,
     nameP1: 'PLAYER 1', nameP2: 'CPU',
@@ -100,10 +99,7 @@ const BeybladeChampionship = () => {
           nameP2: userName || 'PLAYER 2', 
           status: 'READY' 
         });
-        setMyRole('p2'); 
-        setRoomId(rId); 
-        setMode('ONLINE'); 
-        setPhase('LOBBY');
+        setMyRole('p2'); setRoomId(rId); setMode('ONLINE'); setPhase('LOBBY');
       } else {
         alert("SALA NÃO ENCONTRADA!");
       }
@@ -130,7 +126,6 @@ const BeybladeChampionship = () => {
     if ((phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
     
     setGameState(prev => {
-      // Cada jogador olha APENAS para a sua tecla
       const myTarget = myRole === 'p1' ? prev.targetKeyP1 : prev.targetKeyP2;
       
       if (e.key.toUpperCase() === myTarget) {
@@ -140,7 +135,6 @@ const BeybladeChampionship = () => {
 
         if (mode === 'ONLINE') {
           const updates = {};
-          // Atualiza SOMENTE o estado do jogador atual no Firebase
           if (myRole === 'p1') {
             updates['rpmP1'] = Math.min(400, prev.rpmP1 + power);
             updates['targetKeyP1'] = nextKey;
@@ -148,6 +142,7 @@ const BeybladeChampionship = () => {
             updates['rpmP2'] = Math.min(400, prev.rpmP2 + power);
             updates['targetKeyP2'] = nextKey;
           }
+          // P1 e P2 mandam suas atualizações de INPUT
           update(ref(db, `rooms/${roomId}`), updates);
           return prev;
         } else {
@@ -163,7 +158,9 @@ const BeybladeChampionship = () => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
+  // --- LOOP DE FÍSICA CORRIGIDO (O PUL DO GATO) ---
   useEffect(() => {
+    // Só o Host (P1) roda a física
     if ((mode === 'ONLINE' && myRole !== 'p1') || (phase !== 'BATTLE' && gameState.status !== 'BATTLE') || gameState.winner) return;
     
     const interval = setInterval(() => {
@@ -183,17 +180,32 @@ const BeybladeChampionship = () => {
           if (newPos > 700) setCoins(c => c + 10);
         }
 
-        const newState = {
+        // Calculamos os novos valores físicos
+        const newRpmP1 = Math.max(0, prev.rpmP1 - 0.75 * drain);
+        const newRpmP2 = Math.max(0, prev.rpmP2 + cpuBoost - 0.75 * drain);
+
+        // --- CORREÇÃO DE OURO ---
+        // Se estamos online, NÃO enviamos as chaves (targetKeyP1/P2) neste update.
+        // Enviamos APENAS a física. Isso impede que o Host sobrescreva o input do Guest.
+        if (mode === 'ONLINE') {
+            update(ref(db, `rooms/${roomId}`), {
+                battleTime: prev.battleTime + 0.1,
+                clashPos: newPos,
+                rpmP1: newRpmP1,
+                rpmP2: newRpmP2,
+                winner: newWinner
+                // NOTA: targetKeyP1 e P2 NÃO estão aqui!
+            });
+        }
+
+        return {
           ...prev,
           battleTime: prev.battleTime + 0.1,
           clashPos: newPos,
-          rpmP1: Math.max(0, prev.rpmP1 - 0.75 * drain),
-          rpmP2: Math.max(0, prev.rpmP2 + cpuBoost - 0.75 * drain),
+          rpmP1: newRpmP1,
+          rpmP2: newRpmP2,
           winner: newWinner
         };
-
-        if (mode === 'ONLINE') update(ref(db, `rooms/${roomId}`), newState);
-        return newState;
       });
     }, 100);
     return () => clearInterval(interval);
@@ -224,18 +236,12 @@ const BeybladeChampionship = () => {
         .bar-outer { width: 200px; height: 14px; background: #111; border: 3px solid #fff; transform: skewX(-15deg); overflow: hidden; }
         .bar-fill { height: 100%; transition: width 0.1s linear; }
         .stadium { width: 95vw; height: 40vh; border-top: 6px solid #333; border-bottom: 6px solid #333; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #222 0%, #000 100%); }
-        
-        /* FIX DO GIRO: Container apenas move. Rotação vai na IMG */
         .bey { width: 80px; height: 80px; position: absolute; z-index: 5; transition: left 0.1s linear, right 0.1s linear; display: flex; align-items: center; justify-content: center; }
         .bey img { width: 100%; height: 100%; object-fit: contain; }
-        
         .bey-fallback { width: 100%; height: 100%; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 15px currentColor; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; background: #000; }
-        
-        /* FIX VISUAL: Letra flutua ACIMA (-50px) e não gira */
         .qte { position: absolute; top: -50px; background: #fff; color: #000; padding: 10px; border: 4px solid #f1c40f; font-size: 20px; z-index: 50; box-shadow: 4px 4px 0 #000; }
-        
         .panel { border: 4px solid #fff; padding: 20px; background: #111; text-align: center; box-shadow: 6px 6px 0 #c0392b; }
-        .btn { padding: 10px 20px; margin: 5px; background: #000; border: 3px solid #fff; color: #fff; cursor: pointer; font-family: 'Press Start 2P'; font-size: 10px; }
+        .btn { padding: 10px 20px; margin: 5px; background: #000; border: 3px solid #fff; color: #fff; cursor: pointer; font-size: 10px; font-family: 'Press Start 2P'; }
       `}</style>
 
       {isKOFlash && <div className="ko-flash" />}
@@ -262,26 +268,22 @@ const BeybladeChampionship = () => {
         <div className={`stadium ${gameState.battleTime >= 30 ? 'active-sd' : ''}`} style={{background: arenas[arenaType].bg, borderColor: arenas[arenaType].color}}>
           {gameState.battleTime >= 30 && !gameState.winner && <div style={{position: 'absolute', top: '10px', color: 'red', zIndex:20}}>SUDDEN DEATH!</div>}
 
-          {/* JOGADOR 1 (ESQUERDA) */}
+          {/* JOGADOR 1 */}
           <div className="bey" style={{ left: `calc(50% - 80px + ${gameState.clashPos}px)`, color: selectedBey.color }}>
             <img src={mode === 'ONLINE' ? gameState.skinP1 : selectedBey.img} width="100%" alt="P1"
                  style={{ transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)` }}
                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             <div className="bey-fallback" style={{display: 'none', borderColor: selectedBey.color, transform: `rotate(${Date.now() * (gameState.rpmP1/10)}deg)`}}>P1</div>
-            
-            {/* AGORA SIM: MOSTRA A LETRA DE P1 APENAS SE VOCÊ FOR O P1 */}
             {!gameState.winner && myRole === 'p1' && <div className="qte">{gameState.targetKeyP1}</div>}
             {gameState.battleTime >= 30 && <Lightning bolColor="#00d4ff" />}
           </div>
 
-          {/* JOGADOR 2 (DIREITA) */}
+          {/* JOGADOR 2 */}
           <div className="bey" style={{ right: `calc(50% - 80px - ${gameState.clashPos}px)`, color: '#ff4b2b' }}>
             <img src={gameState.skinP2} width="100%" alt="P2"
                  style={{ transform: `rotate(-${Date.now() * (gameState.rpmP2/10)}deg)` }}
                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             <div className="bey-fallback" style={{display: 'none', borderColor: '#ff4b2b', transform: `rotate(-${Date.now() * (gameState.rpmP2/10)}deg)`}}>P2</div>
-            
-            {/* AGORA SIM: MOSTRA A LETRA DE P2 APENAS SE VOCÊ FOR O P2 */}
             {!gameState.winner && myRole === 'p2' && <div className="qte">{gameState.targetKeyP2}</div>}
             {gameState.battleTime >= 30 && <Lightning bolColor="#ff4b2b" />}
           </div>
@@ -292,7 +294,7 @@ const BeybladeChampionship = () => {
         </div>
       )}
 
-      {/* MENUS */}
+      {/* MENUS (MANTIDOS) */}
       {phase === 'TITLE' && (
         <div className="panel">
           <h1 style={{color: '#f1c40f', fontSize: '20px', marginBottom: '20px'}}>BEY-CHAMPION</h1>
