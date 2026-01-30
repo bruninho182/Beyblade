@@ -18,7 +18,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // --- 2. ASSETS ---
-const BATTLE_MUSIC_URL = "/music.mp3"; 
+const BATTLE_MUSIC_URL = "/battlesong.mp3"; 
 const CLASH_SFX_URL = "/clash.mp3"; 
 const ROAR_SFX_URL = "https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a"; 
 
@@ -96,18 +96,15 @@ const BeybladeChampionship = () => {
     battleTime: 0
   });
 
-  // --- FUNÇÃO PARA VIBRAÇÃO (HAPTIC) ---
   const triggerHaptic = (duration = 50) => {
     if (navigator.vibrate) navigator.vibrate(duration);
   };
 
   const rollGacha = () => {
     if (stats.coins < 100) return alert("MOEDAS INSUFICIENTES (100💰)");
-    
     setStats(prev => ({...prev, coins: prev.coins - 100}));
     setGachaAnimating(true);
     setPhase('GACHA_REVEAL');
-
     setTimeout(() => {
         const roll = Math.random();
         let item;
@@ -122,11 +119,9 @@ const BeybladeChampionship = () => {
         } else {
             setInventory(prev => [...prev, item.id]);
         }
-
         setGachaResult({ item, refund });
         setGachaAnimating(false);
         if (item.rarity === 'LEGENDARY') roarRef.current.play().catch(()=>{});
-
     }, 3000);
   };
 
@@ -268,11 +263,8 @@ const BeybladeChampionship = () => {
     }
   }, [mode, roomId, phase]);
 
-  // --- TRATAMENTO UNIFICADO DE INPUT (TECLADO + MOBILE) ---
   const triggerGameAction = useCallback((key) => {
     const inputKey = key.toUpperCase();
-
-    // ULTIMATE
     if (inputKey === 'SPACE' || inputKey === 'ULTIMATE') {
        if (myRole === 'p1' && gameState.ultP1 >= 100) {
           triggerHaptic(200);
@@ -290,10 +282,9 @@ const BeybladeChampionship = () => {
        return;
     }
     
-    // GOLPE NORMAL
     setGameState(prev => {
       if (inputKey === prev.targetKey) {
-        triggerHaptic(50); // Vibra rapidinho no celular
+        triggerHaptic(50); 
         addSparks(prev.clashPos);
         playClashSound();
         const power = prev.battleTime >= 30 ? 45 : 25;
@@ -473,35 +464,58 @@ const BeybladeChampionship = () => {
         .rarity-RARE { color: #2ecc71; }
         .rarity-COMMON { color: #fff; }
 
-        /* CONTROLES MOBILE */
-        .mobile-controls {
-           position: fixed; bottom: 20px; width: 100%; display: none; flex-direction: column; align-items: center; z-index: 500;
+        /* --- O SEGREDO DO MOBILE (CONSOLE MODE) --- */
+        
+        /* 1. Aviso de Rotação (Aparece se estiver em pé) */
+        .rotate-warning { display: none; position: fixed; inset: 0; background: #000; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #f1c40f; }
+        .rotate-icon { font-size: 50px; animation: spinIcon 2s infinite ease-in-out; margin-bottom: 20px; }
+        @keyframes spinIcon { 0% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } 100% { transform: rotate(0deg); } }
+        
+        @media (orientation: portrait) {
+            .rotate-warning { display: flex; }
         }
+
+        /* 2. Controles Console (Só aparece deitado) */
+        .mobile-controls {
+           position: absolute; bottom: 10px; width: 100%; display: none; justify-content: space-between; align-items: flex-end; padding: 0 40px; box-sizing: border-box; z-index: 500; pointer-events: none; /* Deixa clicar no que tá embaixo se precisar */
+        }
+        
+        /* Direita: Grid de Ação */
         .mobile-grid {
-           display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;
+           display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; pointer-events: auto;
         }
         .mob-btn {
-           width: 60px; height: 60px; background: rgba(255, 255, 255, 0.1); border: 2px solid #fff; 
-           border-radius: 10px; color: #fff; font-family: 'Press Start 2P'; font-size: 20px;
+           width: 50px; height: 50px; background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255,255,255,0.5);
+           border-radius: 8px; color: #fff; font-family: 'Press Start 2P'; font-size: 14px;
            display: flex; align-items: center; justify-content: center; user-select: none;
         }
         .mob-btn:active { background: #fff; color: #000; }
         
+        /* Esquerda: Botão Ultimate */
         .ult-btn-mobile {
-            width: 90%; height: 50px; background: linear-gradient(90deg, #ffd700, #ffaa00); border: 3px solid #fff;
-            color: #000; font-family: 'Press Start 2P'; font-size: 16px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center; border-radius: 10px; user-select: none;
-            box-shadow: 0 0 15px #ffd700;
+            width: 80px; height: 80px; background: radial-gradient(circle, #ffd700, #ffaa00); border: 4px solid #fff;
+            color: #000; font-family: 'Press Start 2P'; font-size: 10px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; border-radius: 50%; user-select: none;
+            box-shadow: 0 0 20px #ffd700; pointer-events: auto; text-align: center;
         }
-        .ult-btn-mobile:active { transform: scale(0.95); }
+        .ult-btn-mobile:active { transform: scale(0.9); }
+        .ult-btn-mobile.disabled { filter: grayscale(1); opacity: 0.5; }
 
-        /* MOSTRAR CONTROLES APENAS EM TELAS PEQUENAS */
-        @media (max-width: 768px) {
+        @media (orientation: landscape) and (max-width: 900px) {
            .mobile-controls { display: flex; }
-           .stadium { height: 35vh; margin-top: -20%; } /* Sobe a arena pra caber os botões */
-           .hud-battle { top: 10px; }
+           .stadium { width: 100vw; height: 65vh; border: none; } /* Arena ocupa tela toda */
+           .hud-battle { top: 5px; width: 60%; left: 20%; } /* HUD menorzinho */
+           .bar-outer { width: 100px; height: 8px; } /* Barras menores */
+           .panel { transform: scale(0.8); } /* Menus menores para caber */
         }
       `}</style>
+      
+      {/* TELA DE BLOQUEIO DE ROTAÇÃO */}
+      <div className="rotate-warning">
+         <div className="rotate-icon">📱 ➡️ 📟</div>
+         <p>PLEASE ROTATE YOUR DEVICE</p>
+         <p style={{fontSize:'10px', marginTop:'10px'}}>LANDSCAPE MODE REQUIRED</p>
+      </div>
 
       {isKOFlash && <div className="ko-flash" />}
 
@@ -541,19 +555,26 @@ const BeybladeChampionship = () => {
           </div>
         </div>
 
-        {/* CONTROLES MOBILE (SÓ APARECEM NO CELULAR) */}
+        {/* CONTROLES MOBILE (CONSOLE STYLE) */}
         <div className="mobile-controls">
-           <div className="mobile-grid">
-               {['L','U','R','X','A','B','Y','D','N'].map(key => (
-                  <div key={key} className="mob-btn" onTouchStart={(e) => { e.preventDefault(); triggerGameAction(key); }}>
-                      {key}
-                  </div>
-               ))}
-           </div>
-           <div className={`ult-btn-mobile ${gameState.ultP1 >= 100 ? 'ult-ready' : ''}`} 
-                style={{opacity: gameState.ultP1 >= 100 ? 1 : 0.5}}
+           {/* ESQUERDA: ULTIMATE */}
+           <div className={`ult-btn-mobile ${gameState.ultP1 < 100 ? 'disabled' : ''}`} 
                 onTouchStart={(e) => { e.preventDefault(); triggerGameAction('SPACE'); }}>
-               ULTIMATE BURST!
+               ULT
+           </div>
+
+           {/* DIREITA: BOTÕES DE AÇÃO */}
+           <div className="mobile-grid">
+               {['A','B','C','D','E','F','G','H','I'].map((_, i) => { // Renderiza 9 botões genéricos
+                   // Mapeamos as letras mais comuns do jogo
+                   const keys = ['L','U','R','X','A','B','Y','D','N'];
+                   const k = keys[i];
+                   return (
+                      <div key={k} className="mob-btn" onTouchStart={(e) => { e.preventDefault(); triggerGameAction(k); }}>
+                          {k}
+                      </div>
+                   )
+               })}
            </div>
         </div>
         </>
@@ -582,8 +603,7 @@ const BeybladeChampionship = () => {
         </div>
       )}
 
-      {/* MENUS (GACHA, TITLE, SHOP, LOBBY, ETC) - CÓDIGO IDÊNTICO AO ANTERIOR */}
-      {/* ... (Por brevidade, assume-se que as telas de menu continuam iguais às da V25) ... */}
+      {/* MENUS (GACHA, TITLE, SHOP, LOBBY, ETC) */}
       
       {phase === 'GACHA_REVEAL' && (
         <div className="panel">
