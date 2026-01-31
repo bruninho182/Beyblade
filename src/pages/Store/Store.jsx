@@ -33,7 +33,7 @@ const Store = ({ onBack }) => {
             
             <div className="imageContainer">
               <div className="colorGlow" style={{ backgroundColor: beyblade.color }}></div>
-              <img src={`/public/${beyblade.img}`} alt={beyblade.name} className="beybladeImg" />
+              <img src={`src/assets/${beyblade.img}`} alt={beyblade.name} className="beybladeImg" />
             </div>
 
             <h2 className="beybladeName">{beyblade.name}</h2>
