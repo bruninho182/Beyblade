@@ -1,15 +1,208 @@
-.storeList {
+/* Store.css */
+
+.storeContainer {
+  background-color: #0a0a0a;
+  min-height: 100vh;
+  padding: 40px 20px;
+  font-family: 'Press Start 2P', cursive;
+  color: white;
+}
+
+.storeHeader {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem 4rem;
   justify-content: space-between;
-  padding: 0 10em 0;
+  align-items: center;
+  border-bottom: 4px solid #333;
+  padding-bottom: 20px;
+  margin-bottom: 40px;
+}
+
+.storeTitle {
+  font-size: 20px;
+  color: #f1c40f;
+  margin: 0;
+  text-shadow: 2px 2px #000;
+}
+
+.backBtn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-family: 'Press Start 2P';
+  font-size: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #b03a2e;
+}
+
+.backBtn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #b03a2e;
+}
+
+.storeList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 25px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.beybladeCard {
+  background: #111;
+  border: 3px solid #333;
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  transition: all 0.3s ease;
+  overflow: hidden; /* Garante que as faíscas não saiam do card */
 }
 
 .beybladeCard:hover {
-  cursor: pointer;
+  transform: translateY(-5px);
+  border-color: #fff;
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.1);
+}
+
+/* NOVO: EFEITO DE FAÍSCAS (OVERLAY) */
+.beybladeCard::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-image: 
+    radial-gradient(circle, #fff 1px, transparent 1px),
+    radial-gradient(circle, #f1c40f 1px, transparent 1px);
+  background-size: 50px 50px, 80px 80px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.beybladeCard:hover::before {
+  opacity: 0.4;
+  animation: sparksMove 0.5s steps(5) infinite;
+}
+
+@keyframes sparksMove {
+  0% { background-position: 0 0; }
+  100% { background-position: 50px 80px; }
+}
+
+.rarityBadge {
+  font-size: 8px;
+  color: #888;
+  display: block;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
+/* CONTAINER DA IMAGEM COM ANIMAÇÃO */
+.imageContainer {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.colorGlow {
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  filter: blur(25px);
+  opacity: 0.5;
+  z-index: 1;
+  transition: all 0.3s;
+}
+
+/* PULSO DE ENERGIA NO HOVER */
+.beybladeCard:hover .colorGlow {
+  opacity: 0.8;
+  transform: scale(1.2);
+  animation: pulseEnergy 1.5s infinite alternate;
+}
+
+@keyframes pulseEnergy {
+  from { filter: blur(20px); }
+  to { filter: blur(35px); }
+}
+
+.beybladeImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  position: relative;
+  z-index: 2;
+  animation: spin 4s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.beybladeName {
+  font-size: 14px;
+  margin: 10px 0;
+  color: #fff;
 }
 
 .beybladeType {
-  font-size: smaller;
+  font-size: 9px;
+  color: #f1c40f;
+  margin-bottom: 15px;
+}
+
+.statsBox {
+  margin: 15px 0;
+  padding: 0 10px;
+}
+
+.statBar {
+  background: #222;
+  height: 8px;
+  width: 100%;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+.statBar div {
+  height: 100%;
+  transition: width 1s ease-in-out;
+}
+
+.buyBtn {
+  width: 100%;
+  background: #27ae60;
+  color: white;
+  border: none;
+  padding: 12px;
+  font-family: 'Press Start 2P';
+  font-size: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+  box-shadow: 0 5px 0 #1e8449;
+  z-index: 4;
+  position: relative;
+}
+
+.buyBtn:hover {
+  background: #2ecc71;
+}
+
+.buyBtn:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #1e8449;
+}
+
+@media (max-width: 600px) {
+  .storeList {
+    grid-template-columns: 1fr;
+  }
 }

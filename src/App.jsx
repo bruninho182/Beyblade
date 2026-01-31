@@ -1,12 +1,42 @@
-import React from "react";
+import React, { useState, useEffect } from "react"; // Adicionado hooks para o Ranking
 import Arena from "./components/Arena";
 import "./App.css";
-import { Link } from "react-router";
+import { Link } from "react-router"; 
 import BeyPortal from "./components/BeyPortal";
 
+// Imports do Firebase para o Ranking funcionar
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, onValue, query, orderByChild, limitToLast } from "firebase/database";
+
+// --- CONFIGURAÇÃO FIREBASE ---
+const firebaseConfig = {
+  apiKey: "AIzaSyABAyy8d3qmzJ1gR0M9ykwUstyT2K71Kns",
+  authDomain: "beybladeonline.firebaseapp.com",
+  projectId: "beybladeonline",
+  storageBucket: "beybladeonline.firebasestorage.app",
+  messagingSenderId: "152863484358",
+  appId: "1:152863484358:web:a888dfd532fa7896a26ac7",
+  measurementId: "G-FKLQ21N2XK",
+  databaseURL: "https://beybladeonline-default-rtdb.firebaseio.com"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
 function App() {
-  // Detecta se a largura da tela é de uma janela pequena (Pop-up)
-  // Se for pequena, exibe apenas o jogo. Se for grande, exibe o Portal.
+  const [leaderboard, setLeaderboard] = useState([]); // Estado para os dados do banco
+
+  // --- BUSCA DE RANKING NO FIREBASE ---
+  useEffect(() => {
+    const rankRef = query(ref(db, 'leaderboard'), orderByChild('wins'), limitToLast(10));
+    const unsubscribe = onValue(rankRef, (snapshot) => {
+      const data = [];
+      snapshot.forEach((child) => { data.push(child.val()); });
+      setLeaderboard(data.reverse());
+    });
+    return () => unsubscribe();
+  }, []);
+
   const isGameWindow = window.innerWidth < 1100;
 
   const openGameWindow = () => {
@@ -22,14 +52,12 @@ function App() {
     );
   };
 
-  // RENDERIZAÇÃO CONDICIONAL: JOGO OU SITE
   if (isGameWindow) {
     return <Arena />;
   }
 
   return (
     <div className="portal-container">
-      {/* CABEÇALHO */}
       <header className="game-header">
         <div className="logo-container">
           <h1 className="logo-text">BEY-CHAMPION</h1>
@@ -38,13 +66,11 @@ function App() {
         <nav className="nav-menu">
           <a href="#">NEWS</a>
           <a href="#">FORUM</a>
-          <a href="#">RANKING</a>
           <Link to={"/store"}>STORE</Link>
         </nav>
       </header>
 
       <div className="main-layout">
-        {/* BARRA LATERAL ESQUERDA */}
         <aside className="sidebar left">
           <div className="portal-box">
             <h3>LATEST NEWS</h3>
@@ -54,13 +80,26 @@ function App() {
               <li>• Server Maintenance 2am</li>
             </ul>
           </div>
-          <div className="portal-box tournament-box">
-            <p className="blink">TOURNAMENT</p>
-            <p className="highlight">STARTS SOON!</p>
+
+          {/* RANKING CONECTADO AO FIREBASE */}
+          <div className="portal-box ranking-box">
+            <h3>TOP RANKING</h3>
+            <div className="ranking-list">
+              {leaderboard.length === 0 ? (
+                <p style={{fontSize: '8px', textAlign: 'center'}}>LOADING...</p>
+              ) : (
+                leaderboard.map((player, index) => (
+                  <div key={index} className={`rank-item ${index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : ''}`}>
+                    <span className="pos">{index + 1}º</span>
+                    <span className="name">{player.name || "BLADER"}</span>
+                    <span className="pts">{player.wins}W</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </aside>
 
-        {/* ÁREA CENTRAL - PREVIEW DO JOGO */}
         <main className="game-wrapper">
           <div className="game-preview-container">
             <h2 className="preview-title">READY TO BATTLE?</h2>
@@ -70,7 +109,6 @@ function App() {
           </div>
         </main>
 
-        {/* BARRA LATERAL DIREITA */}
         <aside className="sidebar right">
           <div className="portal-box">
             <h3>COMMUNITY</h3>
@@ -84,12 +122,10 @@ function App() {
         </aside>
       </div>
 
-      {/* RODAPÉ */}
       <footer className="game-footer">
-        <p>BEY-CHAMPION © 2026 - POWERED BY ICD PRO SYSTEMS</p>
+        <p>BEY-CHAMPION © 2026 - POWERED BY BRUNO FERREIRA</p>
       </footer>
 
-      {/* ESTILOS REFORMULADOS */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -115,7 +151,7 @@ function App() {
         .logo-text { color: #f1c40f; font-size: 22px; margin: 0; letter-spacing: 2px; }
         .logo-subtitle { color: #888; font-size: 8px; display: block; margin-top: 5px; }
 
-        .nav-menu a {
+        .nav-menu a, .nav-menu Link {
           color: #fff;
           text-decoration: none;
           font-size: 10px;
@@ -154,13 +190,14 @@ function App() {
           text-align: center;
         }
 
-        .news-list { list-style: none; padding: 0; font-size: 9px; line-height: 2; color: #bbb; }
-        .tournament-box { text-align: center; font-size: 12px; }
-        .highlight { color: #e74c3c; margin-top: 10px; }
-        
-        .blink { animation: blinker 1s linear infinite; color: #f1c40f; }
-        @keyframes blinker { 50% { opacity: 0; } }
+        .ranking-list { display: flex; flex-direction: column; gap: 8px; }
+        .rank-item { display: flex; justify-content: space-between; font-size: 8px; padding-bottom: 5px; border-bottom: 1px solid #222; }
+        .rank-item.gold { color: #f1c40f; text-shadow: 0 0 5px #f1c40f; }
+        .rank-item.silver { color: #bdc3c7; }
+        .rank-item.bronze { color: #cd7f32; }
+        .pts { color: #2ecc71; }
 
+        .news-list { list-style: none; padding: 0; font-size: 9px; line-height: 2; color: #bbb; }
         .game-wrapper {
           flex: 1;
           display: flex;

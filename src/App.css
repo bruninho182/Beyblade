@@ -1,3 +1,18 @@
+* {
+  box-sizing: border-box;
+}
+
+.main-layout {
+  display: flex;
+  justify-content: center; /* Centraliza o conteúdo */
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  max-width: 1200px; /* Limita a largura para não espalhar demais */
+  margin: 0 auto;    /* Centraliza o portal na tela */
+  width: 100%;
+}
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -40,3 +55,57 @@
 .read-the-docs {
   color: #888;
 }
+
+/* ESTILOS DO RANKING NO PORTAL */
+.ranking-box {
+  margin-top: 20px;
+  border-color: #f1c40f !important; /* Destaque para o ranking */
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rank-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px; /* Fonte pequena para caber na barra lateral */
+  padding: 5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rank-item.gold { color: #f1c40f; border: 1px solid #f1c40f; background: rgba(241, 196, 15, 0.1); }
+.rank-item.silver { color: #bdc3c7; }
+.rank-item.bronze { color: #cd7f32; }
+
+.rank-item .pos { font-weight: bold; width: 30px; }
+.rank-item .name { flex: 1; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rank-item .pts { color: #2ecc71; }
+
+.rank-divider {
+  height: 2px;
+  background: #333;
+  margin: 5px 0;
+}
+
+.rank-item.small {
+  font-size: 7px;
+  color: #888;
+  background: none;
+}
+
+.rank-item.gold { color: #f1c40f; text-shadow: 0 0 5px #f1c40f; font-weight: bold; }
+.rank-item.silver { color: #bdc3c7; }
+.rank-item.bronze { color: #cd7f32; }
+.rank-item { 
+  display: flex; 
+  justify-content: space-between; 
+  font-size: 8px; 
+  margin-bottom: 8px; 
+  border-bottom: 1px solid #222; 
+  padding-bottom: 4px;
+}
+.rank-item .pts { color: #2ecc71; }

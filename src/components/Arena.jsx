@@ -77,7 +77,6 @@ const BeybladeChampionship = () => {
   const [arenaType, setArenaType] = useState('CLASSIC');
   const [sparks, setSparks] = useState([]);
   const [isKOFlash, setIsKOFlash] = useState(false);
-  const [leaderboard, setLeaderboard] = useState([]);
   const [isSlowMo, setIsSlowMo] = useState(false);
 
   const [combo, setCombo] = useState(0);
@@ -206,16 +205,6 @@ const BeybladeChampionship = () => {
        });
     }
   }, [stats, inventory, userName, mode]);
-
-  useEffect(() => {
-    const rankRef = query(ref(db, 'leaderboard'), orderByChild('wins'), limitToLast(10));
-    const unsubscribe = onValue(rankRef, (snapshot) => {
-       const data = [];
-       snapshot.forEach((child) => { data.push(child.val()); });
-       setLeaderboard(data.reverse());
-    });
-    return () => unsubscribe();
-  }, []);
 
   useEffect(() => {
      if (gameState.lastUltP1 > 0) {
@@ -618,20 +607,6 @@ const BeybladeChampionship = () => {
   const myRank = getRank(stats.wins);
   const myBadges = checkAchievements(stats);
 
-  const LeaderboardWidget = () => (
-     <div className="leaderboard-container">
-        <h3 style={{color: '#f1c40f', fontSize: '10px', marginBottom: '10px'}}>🏆 TOP WORLD</h3>
-        {leaderboard.length === 0 ? <p style={{fontSize: '8px'}}>LOADING...</p> : 
-          leaderboard.map((p, i) => (
-             <div key={i} style={{display:'flex', justifyContent:'space-between', fontSize:'8px', marginBottom:'4px', padding:'4px', background: p.name === userName ? '#222' : 'transparent', border: p.name === userName ? '1px solid #444' : 'none'}}>
-                <span>{i+1}. {p.name}</span>
-                <span style={{color: '#f1c40f'}}>{p.wins} Wins</span>
-             </div>
-          ))
-        }
-     </div>
-  );
-
   return (
     <div className={`game-root ${getShakeClass()} ${isSlowMo ? 'slow-mo' : ''}`}>
       <style>{`
@@ -719,8 +694,6 @@ const BeybladeChampionship = () => {
         .rarity-LEGENDARY { color: #ffd700; text-shadow: 0 0 10px #ffd700; animation: pulseUlt 1s infinite; }
         .rarity-RARE { color: #2ecc71; }
         .rarity-COMMON { color: #fff; }
-
-        .leaderboard-container { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; padding: 10px; width: 150px; z-index: 50; max-height: 80vh; overflow-y: auto; }
 
         @media (orientation: portrait) { .rotate-warning { display: flex; } }
 
@@ -1013,11 +986,8 @@ const BeybladeChampionship = () => {
           <button className="btn" onClick={() => { bgmRef.current.play().catch(() => {}); userName ? setPhase('MODE_SELECT') : alert("ENTER NAME"); }}>START</button>
           <button className="btn" onClick={() => setPhase('SHOP')}>SHOP</button>
           <button className="btn" onClick={() => setPhase('TASKS')}>TASKS</button>
-          <LeaderboardWidget />
         </div>
       )}
-
-      {phase !== 'BATTLE' && phase !== 'TITLE' && <LeaderboardWidget />}
 
       {phase === 'TASKS' && (
         <div className="panel">
